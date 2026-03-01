@@ -1,0 +1,316 @@
+---
+title: Rhai scripting
+description: Use Rhai scripting to add dynamic logic to your API simulations
+---
+
+Apicentric includes a scripting engine powered by [Rhai](https://rhai.rs/), a lightweight embedded scripting language for Rust. You can use Rhai scripts to add dynamic behavior to your simulated APIs based on request context.
+
+<Info>
+Scripting is enabled by default through the `scripting` feature flag. Scripts are compiled once and cached for performance.
+</Info>
+
+## Basic scripting
+
+Rhai scripts have access to a context object (`ctx`) that contains request information. Scripts can perform calculations, make decisions, and return values that influence the response.
+
+### Simple calculation
+
+```rhai
+let x = 10;
+let y = 20;
+x + y
+```
+
+The last expression in a script is automatically returned.
+
+### Accessing request context
+
+```rhai
+ctx.request.method
+```
+
+This returns the HTTP method (e.g., "GET", "POST") from the current request.
+
+## Context structure
+
+The `ctx` object provides access to request data:
+
+```rhai
+// HTTP method
+ctx.request.method
+
+// Request path
+ctx.request.path
+
+// Query parameters
+ctx.request.query.category
+
+// Headers
+ctx.request.headers["authorization"]
+
+// Request body (if present)
+ctx.request.body
+```
+
+## Built-in functions
+
+The scripting engine registers several helper functions:
+
+<CodeGroup>
+
+```rhai Logging
+log("This is a log message");
+console_log("This appears in the console");
+print("Debug output");
+```
+
+```rhai Current timestamp
+let timestamp = now();
+// Returns ISO 8601 format: "2026-03-01T12:34:56.789Z"
+```
+
+</CodeGroup>
+
+## Script execution
+
+Scripts are executed within the simulator using the `ScriptingEngine`:
+
+```rust
+use apicentric::simulator::scripting::ScriptingEngine;
+use serde_json::json;
+
+let engine = ScriptingEngine::new();
+
+let script = r#"
+    let method = ctx.request.method;
+    if method == "POST" {
+        "created"
+    } else {
+        "retrieved"
+    }
+"#;
+
+let context = json!({
+    "request": {
+        "method": "POST"
+    }
+});
+
+let result = engine.execute(script, &context).unwrap();
+assert_eq!(result, "created");
+```
+
+## Performance optimization
+
+### Script caching
+
+The scripting engine automatically caches compiled scripts:
+
+1. First execution: Script is compiled and cached
+2. Subsequent executions: Cached AST is reused
+
+This provides significant performance benefits for repeated script execution.
+
+### Thread safety
+
+The `ScriptingEngine` is thread-safe and can be shared across multiple requests:
+
+```rust
+use std::sync::Arc;
+
+let engine = Arc::new(ScriptingEngine::new());
+// Clone the Arc and use in multiple threads
+```
+
+## Conditional logic
+
+```rhai
+if ctx.request.method == "POST" {
+    log("Creating new resource");
+    201
+} else if ctx.request.method == "GET" {
+    log("Retrieving resource");
+    200
+} else {
+    405
+}
+```
+
+## Working with data
+
+<CodeGroup>
+
+```rhai Arrays
+let items = [1, 2, 3, 4, 5];
+let sum = 0;
+
+for item in items {
+    sum += item;
+}
+
+sum  // Returns 15
+```
+
+```rhai Objects
+let user = #{
+    name: "Alice",
+    age: 30,
+    active: true
+};
+
+user.name  // Returns "Alice"
+```
+
+```rhai String manipulation
+let name = ctx.request.query.name;
+let greeting = "Hello, " + name + "!";
+greeting
+```
+
+</CodeGroup>
+
+## Return values
+
+Scripts can return various types:
+
+- **Numbers**: `42`, `3.14`
+- **Strings**: `"hello"`
+- **Booleans**: `true`, `false`
+- **Objects**: `#{ key: value }`
+- **Arrays**: `[1, 2, 3]`
+
+The return value is automatically converted to JSON:
+
+```rhai
+#{
+    status: "success",
+    timestamp: now(),
+    method: ctx.request.method
+}
+```
+
+## Error handling
+
+If a script fails to compile or execute, an error is returned:
+
+```rust
+let result = engine.execute("invalid syntax!!!", &context);
+assert!(result.is_err());
+```
+
+<Warning>
+Script errors should be handled gracefully in production. Consider returning a default value or error response when scripts fail.
+</Warning>
+
+## Feature flag
+
+Scripting is controlled by the `scripting` feature flag:
+
+```toml Cargo.toml
+[dependencies]
+apicentric = { version = "*", features = ["scripting"] }
+```
+
+When scripting is disabled, `execute()` always returns `null`:
+
+```rust
+#[cfg(not(feature = "scripting"))]
+let result = engine.execute(script, &context);
+assert_eq!(result, Value::Null);
+```
+
+## Practical examples
+
+### Dynamic status codes
+
+```rhai
+if ctx.request.headers["x-test"] == "true" {
+    // Return 503 for test traffic
+    503
+} else {
+    200
+}
+```
+
+### Request validation
+
+```rhai
+let body = ctx.request.body;
+
+if body.customer_id == () {
+    log("Missing customer_id");
+    #{
+        error: "validation_error",
+        message: "customer_id is required"
+    }
+} else {
+    #{
+        status: "valid"
+    }
+}
+```
+
+### Time-based behavior
+
+```rhai
+let current_time = now();
+log("Request received at: " + current_time);
+
+#{
+    timestamp: current_time,
+    status: "processed"
+}
+```
+
+## Rhai language features
+
+Rhai is a full-featured scripting language with:
+
+- **Variables**: `let x = 10;`
+- **Functions**: `fn add(a, b) { a + b }`
+- **Loops**: `for`, `while`, `loop`
+- **Conditionals**: `if`, `else`, `switch`
+- **Operators**: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `>`, `<`
+- **Arrays**: `[1, 2, 3]`
+- **Objects**: `#{ key: value }`
+- **Closures**: `|x| x * 2`
+
+<Tip>
+For more advanced Rhai features and syntax, visit the [official Rhai documentation](https://rhai.rs/book/).
+</Tip>
+
+## Best practices
+
+- **Keep scripts simple** - Complex logic belongs in plugins or application code
+- **Use logging** - Debug scripts with `log()` statements
+- **Test scripts** - Verify script behavior with different contexts
+- **Cache awareness** - Scripts are cached by their string content
+- **Type safety** - Rhai is dynamically typed; validate inputs
+- **Performance** - Avoid expensive operations in frequently-executed scripts
+
+## Debugging scripts
+
+```rhai
+log("Script started");
+log("Method: " + ctx.request.method);
+log("Path: " + ctx.request.path);
+
+let result = ctx.request.method;
+log("Returning: " + result);
+
+result
+```
+
+Log messages appear in the console output with the prefix "Script log:" or "Script console:".
+
+## Limitations
+
+- No access to filesystem or network
+- No access to external crates or libraries
+- Limited to registered functions and context data
+- Scripts run synchronously (blocking)
+- No sandboxing beyond Rhai's built-in safety
+
+<Info>
+Rhai is designed to be safe and sandboxed. Scripts cannot access the filesystem, network, or unsafe Rust operations.
+</Info>

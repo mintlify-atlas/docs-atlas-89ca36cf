@@ -1,0 +1,279 @@
+---
+title: simulator export
+description: Export Apicentric service definitions to OpenAPI or Postman format
+---
+
+Convert Apicentric service definitions into industry-standard formats like OpenAPI or Postman collections for use with other tools.
+
+## Usage
+
+```bash
+apicentric simulator export --file <INPUT> --output <OUTPUT> --format <FORMAT>
+```
+
+## Arguments
+
+<ParamField path="--file" type="string" required>
+  Path to the Apicentric service definition YAML file to export.
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the exported file will be written. The file extension should match the format (e.g., .json for OpenAPI/Postman).
+</ParamField>
+
+<ParamField path="--format" type="string" required>
+  Export format. Supported values:
+  - `openapi` - Export as OpenAPI 3.0 specification (JSON)
+  - `postman` - Export as Postman Collection v2.1 (JSON)
+</ParamField>
+
+## Options
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be exported without actually creating the output file (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### Export to OpenAPI
+
+```bash
+apicentric simulator export --file services/users.yaml --output openapi.json --format openapi
+```
+
+**Example output:**
+
+```
+✅ Exported service to openapi.json in Openapi format
+```
+
+The generated OpenAPI file can be used with tools like Swagger UI, Redoc, or imported into API management platforms.
+
+### Export to Postman
+
+```bash
+apicentric simulator export --file services/api.yaml --output collection.json --format postman
+```
+
+**Example output:**
+
+```
+✅ Exported service to collection.json in Postman format
+```
+
+You can import the generated collection directly into Postman.
+
+### Dry run mode
+
+```bash
+apicentric simulator export --file services/users.yaml --output api.json --format openapi --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would export service 'services/users.yaml' to 'api.json' in Openapi format
+```
+
+## Export formats
+
+### OpenAPI 3.0
+
+Exports to OpenAPI 3.0 JSON specification including:
+
+- **Info** - Service name, version, description
+- **Servers** - Base URL from service configuration
+- **Paths** - All endpoints with operations
+- **Components** - Schemas from type definitions
+- **Responses** - Response codes and bodies
+- **Security** - Authentication schemes
+
+Example OpenAPI output structure:
+
+```json
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Users API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {"url": "http://localhost:8001/api/v1"}
+  ],
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "List users",
+        "responses": {
+          "200": {...}
+        }
+      }
+    }
+  }
+}
+```
+
+### Postman Collection v2.1
+
+Exports to Postman Collection format including:
+
+- **Info** - Collection name and description
+- **Items** - Requests organized by folders
+- **Variables** - Service configuration variables
+- **Events** - Pre-request and test scripts (where applicable)
+- **Auth** - Authentication configuration
+
+Example Postman output structure:
+
+```json
+{
+  "info": {
+    "name": "Users API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List users",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/users"
+      }
+    }
+  ]
+}
+```
+
+## Use cases
+
+### Generate API documentation
+
+```bash
+# Export to OpenAPI
+apicentric simulator export --file services/api.yaml --output docs/openapi.json --format openapi
+
+# Serve with Swagger UI
+npx swagger-ui-watcher docs/openapi.json
+```
+
+### Share with team via Postman
+
+```bash
+# Export to Postman
+apicentric simulator export --file services/api.yaml --output collection.json --format postman
+
+# Team members can import collection.json into Postman
+```
+
+### Generate client SDKs
+
+```bash
+# Export to OpenAPI
+apicentric simulator export --file services/api.yaml --output openapi.json --format openapi
+
+# Generate client with OpenAPI Generator
+openapi-generator-cli generate -i openapi.json -g typescript-fetch -o client/
+```
+
+### CI/CD documentation generation
+
+```bash
+#!/bin/bash
+# Export all services to OpenAPI
+for service in services/*.yaml; do
+  name=$(basename "$service" .yaml)
+  apicentric simulator export \
+    --file "$service" \
+    --output "docs/${name}.json" \
+    --format openapi
+done
+```
+
+### API contract validation
+
+```bash
+# Export to OpenAPI for contract testing tools
+apicentric simulator export --file services/api.yaml --output contract.json --format openapi
+
+# Use with contract testing tools
+dredd contract.json http://localhost:8080
+```
+
+## Related commands
+
+- [`simulator import`](/cli/simulator/import) - Import from OpenAPI/Postman to Apicentric format
+- [`simulator generate-types`](/cli/simulator/generate-types) - Generate TypeScript types
+- [`simulator validate`](/cli/simulator/validate) - Validate service definition before export
+
+<Info>
+Export your service definitions to integrate Apicentric with your existing API toolchain. The exported files are standards-compliant and work with popular API tools.
+</Info>
+
+## Troubleshooting
+
+### Failed to read service
+
+```
+❌ Failed to read service: No such file or directory
+```
+
+**Solution:** Verify the input file path is correct:
+
+```bash
+ls -l services/users.yaml
+```
+
+### Invalid service YAML
+
+```
+❌ Invalid service YAML: expected mapping at line 10
+```
+
+**Solution:** Validate your service definition first:
+
+```bash
+apicentric simulator validate --file services/users.yaml --verbose
+```
+
+### Failed to serialize
+
+```
+❌ Failed to serialize OpenAPI: invalid schema reference
+```
+
+**Solution:** Check your type definitions and schema references in the service definition. Ensure all referenced types are defined.
+
+### Invalid format
+
+```
+❌ Invalid format 'swagger'. Use 'openapi' or 'postman'
+```
+
+**Solution:** Use one of the supported format values:
+
+```bash
+apicentric simulator export --file services/api.yaml --output spec.json --format openapi
+```
+
+## Best practices
+
+1. **Validate before exporting** - Run `simulator validate` to catch errors early
+2. **Version control exports** - Commit exported files to track API changes
+3. **Automate in CI** - Generate exports automatically on merge to main
+4. **Use meaningful names** - Name output files clearly (e.g., `users-api-v1.json`)
+5. **Test exported files** - Verify exported specifications work with target tools

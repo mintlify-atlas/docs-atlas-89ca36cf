@@ -1,0 +1,619 @@
+---
+title: service.yaml
+description: Define API endpoints, responses, and behaviors using YAML service definitions
+---
+
+Service definition files use YAML format to describe your API services, including endpoints, request/response structures, and simulation behaviors.
+
+## Location
+
+By default, service definition files are stored in the directory specified by `simulator.services_dir` in your `apicentric.json` (default: `services/`).
+
+## File naming
+
+You can name your service files anything you want, as long as they have a `.yaml` or `.yml` extension. Apicentric automatically discovers and loads all YAML files in the services directory.
+
+**Examples:**
+- `user-service.yaml`
+- `payment-api.yaml`
+- `inventory.yml`
+
+## Basic structure
+
+<CodeGroup>
+```yaml service.yaml
+name: Demo API
+version: "1.0"
+description: A demo API for the walkthrough
+server:
+  port: 9005
+  base_path: /api/v1
+
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          [
+            {"id": 1, "name": "Alice"},
+            {"id": 2, "name": "Bob"}
+          ]
+```
+</CodeGroup>
+
+## Service metadata
+
+Define basic information about your service.
+
+<ParamField path="name" type="string" required>
+  The name of your service. This appears in logs and the admin interface.
+</ParamField>
+
+<ParamField path="version" type="string">
+  Semantic version of your service definition.
+  
+  **Example:** `"1.0"`, `"2.1.0"`
+</ParamField>
+
+<ParamField path="description" type="string">
+  Human-readable description of what this service does.
+</ParamField>
+
+## Server configuration
+
+Configure how your service listens for requests.
+
+<ParamField path="server" type="object">
+  Server configuration for the service
+  
+  <ParamField path="server.port" type="number">
+    Port number to listen on. If not specified, Apicentric automatically assigns a port from the configured range.
+    
+    <Warning>
+    Ports below 1024 require elevated permissions and will generate a validation warning.
+    </Warning>
+  </ParamField>
+  
+  <ParamField path="server.base_path" type="string" required>
+    Base path prefix for all endpoints. Must start with `/`.
+    
+    **Example:** `/api/v1`, `/`, `/services`
+  </ParamField>
+  
+  <ParamField path="server.proxy_base_url" type="string">
+    Base URL to proxy requests when no local endpoint matches. Useful for partial mocking.
+    
+    **Example:** `http://production-api.example.com`
+  </ParamField>
+  
+  <ParamField path="server.record_unknown" type="boolean">
+    When enabled with `proxy_base_url`, automatically records proxied responses for later use.
+    
+    **Default:** `false`
+  </ParamField>
+  
+  <ParamField path="server.cors" type="object">
+    CORS configuration for cross-origin requests.
+    
+    <ParamField path="server.cors.enabled" type="boolean" required>
+      Enable CORS support.
+    </ParamField>
+    
+    <ParamField path="server.cors.origins" type="array" required>
+      List of allowed origins.
+      
+      **Example:** `["http://localhost:3000", "https://app.example.com"]`
+    </ParamField>
+    
+    <ParamField path="server.cors.methods" type="array">
+      Allowed HTTP methods.
+      
+      **Example:** `["GET", "POST", "PUT", "DELETE"]`
+    </ParamField>
+    
+    <ParamField path="server.cors.headers" type="array">
+      Allowed request headers.
+      
+      **Example:** `["Content-Type", "Authorization"]`
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+## Data models
+
+Define reusable JSON schemas for request and response validation.
+
+<ParamField path="models" type="object">
+  Map of model names to JSON Schema definitions.
+  
+  <CodeGroup>
+  ```yaml Example
+  models:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - name
+  ```
+  </CodeGroup>
+</ParamField>
+
+## Fixtures
+
+Define reusable test data that can be referenced in responses.
+
+<ParamField path="fixtures" type="object">
+  Map of fixture names to data objects.
+  
+  <CodeGroup>
+  ```yaml Example
+  fixtures:
+    users:
+      - id: 1
+        name: Alice
+      - id: 2
+        name: Bob
+  ```
+  </CodeGroup>
+  
+  You can reference fixtures in responses using Handlebars: `{{fixture "users"}}`
+</ParamField>
+
+## Bucket storage
+
+Define initial state for the in-memory bucket storage.
+
+<ParamField path="bucket" type="object">
+  Map of bucket keys to initial values.
+  
+  <CodeGroup>
+  ```yaml Example
+  bucket:
+    user_count: 0
+    last_login: null
+  ```
+  </CodeGroup>
+  
+  Access bucket values in templates: `{{bucket "user_count"}}`
+</ParamField>
+
+## Endpoints
+
+Define the API endpoints your service exposes.
+
+<ParamField path="endpoints" type="array" required>
+  Array of endpoint definitions.
+  
+  <ParamField path="endpoints[].kind" type="string">
+    Type of endpoint.
+    
+    **Options:**
+    - `http` - Standard HTTP request/response (default)
+    - `websocket` or `ws` - WebSocket endpoint
+    - `sse` - Server-Sent Events endpoint
+    
+    **Default:** `http`
+  </ParamField>
+  
+  <ParamField path="endpoints[].method" type="string" required>
+    HTTP method for the endpoint.
+    
+    **Options:** `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`
+  </ParamField>
+  
+  <ParamField path="endpoints[].path" type="string" required>
+    URL path for the endpoint. Must start with `/`.
+    
+    Supports path parameters using curly braces: `/users/{id}`
+  </ParamField>
+  
+  <ParamField path="endpoints[].description" type="string">
+    Human-readable description of what this endpoint does.
+  </ParamField>
+  
+  <ParamField path="endpoints[].header_match" type="object">
+    Optional headers that must match for this endpoint to trigger. Useful for API versioning.
+    
+    <CodeGroup>
+    ```yaml Example
+    header_match:
+      X-API-Version: "2.0"
+    ```
+    </CodeGroup>
+  </ParamField>
+  
+  <ParamField path="endpoints[].parameters" type="array">
+    Array of parameter definitions.
+    
+    <ParamField path="endpoints[].parameters[].name" type="string" required>
+      Parameter name.
+    </ParamField>
+    
+    <ParamField path="endpoints[].parameters[].in" type="string" required>
+      Parameter location: `path`, `query`, or `header`.
+    </ParamField>
+    
+    <ParamField path="endpoints[].parameters[].type" type="string" required>
+      Parameter data type: `string`, `number`, `integer`, `boolean`.
+    </ParamField>
+    
+    <ParamField path="endpoints[].parameters[].required" type="boolean" required>
+      Whether the parameter is required.
+    </ParamField>
+    
+    <ParamField path="endpoints[].parameters[].description" type="string">
+      Parameter description.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="endpoints[].request_body" type="object">
+    Expected request body definition.
+    
+    <ParamField path="endpoints[].request_body.required" type="boolean">
+      Whether a request body is required.
+      
+      **Default:** `false`
+    </ParamField>
+    
+    <ParamField path="endpoints[].request_body.schema" type="string">
+      Reference to a model name defined in the `models` section.
+    </ParamField>
+    
+    <ParamField path="endpoints[].request_body.content_type" type="string">
+      Expected content type for the request body.
+      
+      **Example:** `application/json`
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="endpoints[].responses" type="object" required>
+    Map of HTTP status codes to response definitions. Must have at least one response.
+    
+    <ParamField path="endpoints[].responses[status].content_type" type="string" required>
+      Response content type.
+      
+      **Example:** `application/json`, `text/plain`
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].body" type="string" required>
+      Response body as a string. Supports Handlebars templates for dynamic content.
+      
+      **Template variables:**
+      - `{{request.body}}` - Request body
+      - `{{request.query.param}}` - Query parameters
+      - `{{request.params.id}}` - Path parameters
+      - `{{now}}` - Current timestamp
+      - `{{uuid}}` - Random UUID
+      - `{{faker "name.firstName"}}` - Faker.js data
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].condition" type="string">
+      Handlebars condition that must evaluate to true for this response to be used.
+      
+      <CodeGroup>
+      ```yaml Example
+      condition: "{{eq request.query.type 'premium'}}"
+      ```
+      </CodeGroup>
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].schema" type="string">
+      Reference to a model name for response validation.
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].script" type="string">
+      Path to a JavaScript/TypeScript file that generates the response programmatically.
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].headers" type="object">
+      Additional response headers.
+      
+      <CodeGroup>
+      ```yaml Example
+      headers:
+        X-Rate-Limit: "100"
+        Cache-Control: "no-cache"
+      ```
+      </CodeGroup>
+    </ParamField>
+    
+    <ParamField path="endpoints[].responses[status].side_effects" type="array">
+      Side effects to trigger when this response is sent.
+      
+      <ParamField path="endpoints[].responses[status].side_effects[].action" type="string" required>
+        Action to perform: `set`, `increment`, `decrement`.
+      </ParamField>
+      
+      <ParamField path="endpoints[].responses[status].side_effects[].target" type="string" required>
+        Target bucket key to modify.
+      </ParamField>
+      
+      <ParamField path="endpoints[].responses[status].side_effects[].value" type="string" required>
+        Value to set (supports templates).
+      </ParamField>
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="endpoints[].scenarios" type="array">
+    Scenario-based responses with conditional matching.
+    
+    <ParamField path="endpoints[].scenarios[].name" type="string">
+      Scenario name for manual selection.
+    </ParamField>
+    
+    <ParamField path="endpoints[].scenarios[].conditions" type="object">
+      Conditions for this scenario to match.
+      
+      <ParamField path="endpoints[].scenarios[].conditions.query" type="object">
+        Query parameters that must match.
+      </ParamField>
+      
+      <ParamField path="endpoints[].scenarios[].conditions.headers" type="object">
+        Headers that must match.
+      </ParamField>
+      
+      <ParamField path="endpoints[].scenarios[].conditions.body" type="object">
+        Body fields that must match.
+      </ParamField>
+    </ParamField>
+    
+    <ParamField path="endpoints[].scenarios[].response" type="object" required>
+      Response to return when this scenario matches.
+      
+      <ParamField path="endpoints[].scenarios[].response.status" type="number" required>
+        HTTP status code.
+      </ParamField>
+      
+      All fields from the standard response definition are supported.
+    </ParamField>
+    
+    <ParamField path="endpoints[].scenarios[].strategy" type="string">
+      Strategy for auto-selecting scenarios: `sequential` or `random`.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="endpoints[].stream" type="object">
+    Streaming configuration for WebSocket and SSE endpoints.
+    
+    <ParamField path="endpoints[].stream.initial" type="array">
+      Messages sent immediately after connection.
+      
+      <CodeGroup>
+      ```yaml Example
+      stream:
+        initial:
+          - '{"type": "welcome", "message": "Connected"}'
+      ```
+      </CodeGroup>
+    </ParamField>
+    
+    <ParamField path="endpoints[].stream.periodic" type="object">
+      Periodic message configuration.
+      
+      <ParamField path="endpoints[].stream.periodic.interval_ms" type="number" required>
+        Interval in milliseconds between messages.
+      </ParamField>
+      
+      <ParamField path="endpoints[].stream.periodic.message" type="string" required>
+        Message template (supports Handlebars).
+      </ParamField>
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+## GraphQL configuration
+
+Configure GraphQL endpoint support.
+
+<ParamField path="graphql" type="object">
+  GraphQL configuration for the service.
+  
+  <ParamField path="graphql.schema_path" type="string" required>
+    Path to the GraphQL schema file (`.graphql`).
+  </ParamField>
+  
+  <ParamField path="graphql.mocks" type="object" required>
+    Map of operation names to Handlebars template files.
+    
+    <CodeGroup>
+    ```yaml Example
+    graphql:
+      schema_path: schema.graphql
+      mocks:
+        getUser: templates/get-user.hbs
+        listUsers: templates/list-users.hbs
+    ```
+    </CodeGroup>
+  </ParamField>
+</ParamField>
+
+## Behavior simulation
+
+Configure behavior simulation for this specific service.
+
+<ParamField path="behavior" type="object">
+  Behavior configuration that overrides global settings.
+  
+  <ParamField path="behavior.latency" type="object">
+    Simulate network latency.
+    
+    <ParamField path="behavior.latency.min_ms" type="number" required>
+      Minimum latency in milliseconds.
+    </ParamField>
+    
+    <ParamField path="behavior.latency.max_ms" type="number" required>
+      Maximum latency in milliseconds.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="behavior.error_simulation" type="object">
+    Simulate random errors.
+    
+    <ParamField path="behavior.error_simulation.enabled" type="boolean" required>
+      Enable error simulation.
+    </ParamField>
+    
+    <ParamField path="behavior.error_simulation.rate" type="number" required>
+      Error rate between 0.0 and 1.0.
+    </ParamField>
+    
+    <ParamField path="behavior.error_simulation.status_codes" type="array">
+      HTTP status codes to return when simulating errors.
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="behavior.rate_limiting" type="object">
+    Simulate rate limiting.
+    
+    <ParamField path="behavior.rate_limiting.enabled" type="boolean" required>
+      Enable rate limiting.
+    </ParamField>
+    
+    <ParamField path="behavior.rate_limiting.requests_per_minute" type="number" required>
+      Maximum requests allowed per minute.
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+## Complete example
+
+<CodeGroup>
+```yaml full-example.yaml
+name: User Service
+version: "2.0"
+description: Complete user management API
+
+server:
+  port: 9010
+  base_path: /api/v2
+  cors:
+    enabled: true
+    origins:
+      - http://localhost:3000
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+
+models:
+  User:
+    type: object
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      email:
+        type: string
+    required:
+      - name
+      - email
+
+fixtures:
+  default_users:
+    - id: 1
+      name: Alice
+      email: alice@example.com
+    - id: 2
+      name: Bob
+      email: bob@example.com
+
+bucket:
+  user_count: 2
+
+endpoints:
+  - method: GET
+    path: /users
+    description: List all users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {{json (fixture "default_users")}}
+
+  - method: POST
+    path: /users
+    description: Create a new user
+    request_body:
+      required: true
+      schema: User
+      content_type: application/json
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "id": {{bucket "user_count"}},
+            "name": "{{request.body.name}}",
+            "email": "{{request.body.email}}",
+            "created_at": "{{now}}"
+          }
+        side_effects:
+          - action: increment
+            target: user_count
+            value: "1"
+
+  - method: GET
+    path: /users/{id}
+    description: Get a specific user
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: User ID
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": {{request.params.id}},
+            "name": "User {{request.params.id}}",
+            "email": "user{{request.params.id}}@example.com"
+          }
+
+behavior:
+  latency:
+    min_ms: 50
+    max_ms: 200
+  error_simulation:
+    enabled: false
+    rate: 0.0
+```
+</CodeGroup>
+
+## Validation
+
+Apicentric validates your service definitions when loading them:
+
+- HTTP methods must be valid (GET, POST, etc.)
+- Paths must start with `/`
+- Each endpoint must have at least one response
+- Status codes must be between 100-599
+- Content types must be non-empty
+
+You'll see detailed validation errors if any issues are found.
+
+## Best practices
+
+1. **Use models for consistency** - Define reusable JSON schemas for common data structures
+2. **Leverage fixtures for test data** - Keep test data organized and reusable
+3. **Use templates for dynamic responses** - Make responses realistic with Handlebars helpers
+4. **Add descriptions** - Document your endpoints to help team members understand the API
+5. **Test with behaviors** - Use latency and error simulation to test your application's resilience
+
+## Related pages
+
+- [apicentric.json](/configuration/apicentric-json) - Main configuration file
+- [Environment Variables](/configuration/environment-variables) - Environment variable reference

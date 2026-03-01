@@ -1,0 +1,168 @@
+---
+title: Introduction
+description: A powerful CLI tool and API simulator platform for developers who love the terminal
+---
+
+Apicentric is a **Rust-based CLI tool and API simulator platform** that helps developers mock APIs, test contracts, generate code, and simulate IoT devices—all from the terminal.
+
+## What is Apicentric?
+
+Apicentric transforms how you work with APIs during development and testing. Whether you're a frontend developer needing a backend API, a QA engineer validating service contracts, or an IoT developer simulating device fleets, Apicentric has you covered.
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get up and running with your first mock API in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install via npm, Homebrew, or build from source
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/cli/overview">
+    Explore all commands and options
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/ecommerce-api">
+    Learn from real-world use cases
+  </Card>
+</CardGroup>
+
+## Key features
+
+Apicentric provides everything you need for modern API development and testing:
+
+### API simulator
+
+Mock REST and GraphQL APIs with simple YAML configuration. Define endpoints, responses, and data fixtures in minutes.
+
+- Path parameters and regex matching
+- Dynamic templates with Handlebars
+- Request validation and conditional responses
+- Scenarios for different API states (latency, errors, maintenance)
+- Recording proxy to capture real API traffic
+
+### Contract testing
+
+Validate that your mocks match real APIs automatically.
+
+- Compare mock vs. real responses
+- HTML reports with visual diffs
+- CI/CD integration
+- Compatibility policies (strict, lenient, recommended)
+
+### Code generation
+
+Generate client code from your service definitions.
+
+- TypeScript type definitions
+- React Query hooks
+- React components
+- Export to OpenAPI and Postman
+
+### MCP integration
+
+Power AI assistants like Claude with API mocking tools via Model Context Protocol.
+
+- Natural language API creation
+- Automated testing setup
+- Service management from chat
+
+### IoT digital twins
+
+Simulate industrial devices with realistic physics and protocols.
+
+- Actor-based device simulation
+- MQTT and Modbus TCP support
+- Physics strategies (sine waves, noise, custom scripts)
+- Multi-device fleet simulation
+
+### Terminal UI
+
+Manage services with an interactive terminal dashboard.
+
+- Real-time service status
+- Live request logs with filtering
+- Keyboard-driven workflow
+- Multi-pane layout
+
+## Who is it for?
+
+<AccordionGroup>
+  <Accordion title="Frontend developers">
+    Mock backend APIs instantly without waiting for backend teams. Define your ideal API contract and start building immediately.
+  </Accordion>
+  
+  <Accordion title="QA engineers">
+    Test edge cases and error scenarios easily. Validate API contracts between services automatically.
+  </Accordion>
+  
+  <Accordion title="Backend developers">
+    Prototype APIs before implementation. Generate OpenAPI specs from your mocks.
+  </Accordion>
+  
+  <Accordion title="IoT developers">
+    Simulate device fleets without physical hardware. Test MQTT and Modbus integrations.
+  </Accordion>
+  
+  <Accordion title="DevOps teams">
+    Containerize services with Docker. Integrate into CI/CD pipelines.
+  </Accordion>
+</AccordionGroup>
+
+## How it works
+
+Apicentric follows a simple workflow:
+
+<Steps>
+  <Step title="Define your API">
+    Create a YAML file describing your endpoints, responses, and data fixtures.
+  </Step>
+  
+  <Step title="Start the simulator">
+    Run `apicentric simulator start` to launch your mock API.
+  </Step>
+  
+  <Step title="Test and iterate">
+    Send requests to your API and refine your service definition.
+  </Step>
+  
+  <Step title="Generate code (optional)">
+    Generate TypeScript types, React Query hooks, or export to OpenAPI.
+  </Step>
+  
+  <Step title="Deploy (optional)">
+    Dockerize your service for easy sharing and deployment.
+  </Step>
+</Steps>
+
+## Why Apicentric?
+
+<Note>
+Apicentric is built for developers who love the terminal and want powerful tools that stay out of their way.
+</Note>
+
+**Simple YAML configuration** — No complex UIs or heavy frameworks. Just clean, version-controllable YAML.
+
+**Powerful templating** — Handlebars templates with Faker integration for realistic data.
+
+**Multiple protocols** — REST, GraphQL, WebSocket, SSE, MQTT, Modbus TCP.
+
+**Production-ready** — Docker support, CI/CD integration, contract testing.
+
+**Extensible** — Plugin system (experimental), Rhai scripting, custom templates.
+
+**Fast** — Built in Rust for performance and reliability.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install Apicentric" icon="download" href="/installation">
+    Choose your preferred installation method
+  </Card>
+  <Card title="Quick start guide" icon="bolt" href="/quickstart">
+    Create your first mock API in 5 minutes
+  </Card>
+  <Card title="Core concepts" icon="book" href="/concepts/overview">
+    Learn about service definitions, fixtures, and scenarios
+  </Card>
+  <Card title="Browse examples" icon="code" href="/examples/ecommerce-api">
+    Explore real-world use cases
+  </Card>
+</CardGroup>

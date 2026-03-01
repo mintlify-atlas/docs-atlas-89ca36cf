@@ -1,0 +1,277 @@
+---
+title: Environment variables
+description: Configure Apicentric using environment variables for deployment and security
+---
+
+Apicentric can be configured using environment variables, which is useful for deployment scenarios and keeping sensitive data like API keys out of configuration files.
+
+## Loading environment variables
+
+Apicentric automatically loads environment variables from a `.env` file in your project root if one exists. You can also set environment variables directly in your shell or deployment platform.
+
+## Creating a .env file
+
+Copy the `.env.example` file to create your own `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` with your specific values.
+
+<Warning>
+Never commit `.env` files to version control. Add `.env` to your `.gitignore` file.
+</Warning>
+
+## Server configuration
+
+Control how Apicentric's HTTP server runs.
+
+<ParamField path="APICENTRIC_PORT" type="number" default="8000">
+  Port number for the Apicentric server.
+  
+  **Example:** `APICENTRIC_PORT=8080`
+</ParamField>
+
+<ParamField path="APICENTRIC_HOST" type="string" default="0.0.0.0">
+  Host address to bind the server to.
+  
+  - `0.0.0.0` - Listen on all network interfaces
+  - `127.0.0.1` - Listen only on localhost
+  
+  **Example:** `APICENTRIC_HOST=127.0.0.1`
+</ParamField>
+
+## Authentication
+
+Configure authentication and security settings.
+
+<ParamField path="APICENTRIC_PROTECT_SERVICES" type="boolean" default="false">
+  When enabled, requires authentication for all API endpoints.
+  
+  Set to `true` to enable JWT authentication.
+  
+  **Example:** `APICENTRIC_PROTECT_SERVICES=true`
+</ParamField>
+
+<ParamField path="APICENTRIC_JWT_SECRET" type="string" required>
+  Secret key used to sign and verify JWT tokens.
+  
+  <Warning>
+  In production, use a strong, randomly generated secret. You can generate one using:
+  ```bash
+  openssl rand -base64 32
+  ```
+  </Warning>
+  
+  **Example:** `APICENTRIC_JWT_SECRET=your-secret-key-here`
+</ParamField>
+
+## Database
+
+Configure the database for persistent storage.
+
+<ParamField path="APICENTRIC_DB_PATH" type="string" default="./data/apicentric.db">
+  Path to the SQLite database file.
+  
+  The directory will be created automatically if it doesn't exist.
+  
+  **Example:** `APICENTRIC_DB_PATH=/var/lib/apicentric/db.sqlite`
+</ParamField>
+
+## CORS configuration
+
+Configure Cross-Origin Resource Sharing (CORS) for browser requests.
+
+<ParamField path="ALLOWED_ORIGINS" type="string">
+  Comma-separated list of allowed origins for CORS requests.
+  
+  This is useful when your frontend application runs on a different domain or port than Apicentric.
+  
+  **Example:** `ALLOWED_ORIGINS=http://localhost:3000,https://app.example.com`
+  
+  **Default:** `http://localhost:3000,http://localhost:9002`
+</ParamField>
+
+## Logging
+
+Control logging verbosity and output.
+
+<ParamField path="RUST_LOG" type="string" default="info,apicentric=debug">
+  Log level configuration using Rust's `env_logger` format.
+  
+  **Log levels:**
+  - `error` - Only errors
+  - `warn` - Warnings and errors
+  - `info` - Informational messages (default)
+  - `debug` - Detailed debugging information
+  - `trace` - Very verbose tracing output
+  
+  You can set different levels for different modules:
+  
+  **Examples:**
+  ```bash
+  # Set global level to info, Apicentric to debug
+  RUST_LOG=info,apicentric=debug
+  
+  # Verbose logging for everything
+  RUST_LOG=trace
+  
+  # Only errors
+  RUST_LOG=error
+  ```
+</ParamField>
+
+## AI configuration
+
+Configure AI providers for code generation features.
+
+<ParamField path="OPENAI_API_KEY" type="string">
+  API key for OpenAI services.
+  
+  Required if you set `ai.provider` to `openai` in your `apicentric.json`.
+  
+  **Example:** `OPENAI_API_KEY=sk-...`
+</ParamField>
+
+<ParamField path="GEMINI_API_KEY" type="string">
+  API key for Google Gemini services.
+  
+  Required if you set `ai.provider` to `gemini` in your `apicentric.json`, unless you specify the API key directly in the config file.
+  
+  **Example:** `GEMINI_API_KEY=AIza...`
+</ParamField>
+
+## Frontend configuration
+
+These variables are used by the Apicentric web UI.
+
+<ParamField path="NEXT_PUBLIC_API_URL" type="string" default="http://localhost:8000">
+  URL of the Apicentric API server.
+  
+  This tells the frontend where to send API requests.
+  
+  **Example:** `NEXT_PUBLIC_API_URL=http://localhost:8000`
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_WS_URL" type="string" default="ws://localhost:8000/ws">
+  WebSocket URL for real-time updates.
+  
+  Used for live log streaming and state updates in the web UI.
+  
+  **Example:** `NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws`
+</ParamField>
+
+## Production settings
+
+Configure behavior for production deployments.
+
+<ParamField path="NODE_ENV" type="string" default="development">
+  Node.js environment mode.
+  
+  **Options:**
+  - `development` - Development mode with hot reloading
+  - `production` - Optimized production builds
+  
+  **Example:** `NODE_ENV=production`
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_ENABLE_CONSOLE" type="boolean" default="true">
+  Enable console logging in the frontend application.
+  
+  Set to `false` in production to disable console logs.
+  
+  **Example:** `NEXT_PUBLIC_ENABLE_CONSOLE=false`
+</ParamField>
+
+## Complete example
+
+<CodeGroup>
+```bash .env
+# Server Configuration
+APICENTRIC_PORT=8000
+APICENTRIC_HOST=0.0.0.0
+
+# Authentication
+APICENTRIC_PROTECT_SERVICES=false
+APICENTRIC_JWT_SECRET=change-this-to-a-secure-random-string
+
+# Database
+APICENTRIC_DB_PATH=./data/apicentric.db
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:9002
+
+# Logging
+RUST_LOG=info,apicentric=debug
+
+# AI Configuration
+OPENAI_API_KEY=your-openai-api-key-here
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# Frontend Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws
+
+# Production Settings
+NODE_ENV=development
+NEXT_PUBLIC_ENABLE_CONSOLE=true
+```
+</CodeGroup>
+
+## Environment variable precedence
+
+When the same setting can be configured in multiple places, Apicentric uses this precedence order (highest to lowest):
+
+1. **Command-line arguments** - Flags passed directly to the CLI
+2. **Environment variables** - Set in your shell or `.env` file
+3. **Configuration file** - Settings in `apicentric.json`
+4. **Default values** - Built-in defaults
+
+## Security best practices
+
+<Note>
+Follow these security best practices when working with environment variables:
+</Note>
+
+1. **Never commit secrets to version control**
+   - Add `.env` to your `.gitignore`
+   - Use `.env.example` as a template without real secrets
+
+2. **Use strong, random secrets**
+   - Generate JWT secrets with at least 32 bytes of randomness
+   - Rotate secrets periodically
+
+3. **Restrict access in production**
+   - Store secrets in your deployment platform's secret management system
+   - Use environment-specific `.env` files
+   - Limit who can access production secrets
+
+4. **Use read-only database paths**
+   - Ensure the database directory has appropriate permissions
+   - Back up your database regularly
+
+## Deployment platforms
+
+Most deployment platforms provide ways to set environment variables:
+
+- **Docker**: Use `docker run -e` or `docker-compose.yml` env sections
+- **Kubernetes**: Use ConfigMaps and Secrets
+- **Heroku**: Use `heroku config:set`
+- **Vercel/Netlify**: Use the dashboard or CLI to set environment variables
+- **AWS/GCP/Azure**: Use their respective secret management services
+
+## Debugging environment variables
+
+To verify which environment variables are loaded, you can check the logs when Apicentric starts. The log output will show which configuration values are being used (with secrets redacted).
+
+You can also use the following command to see all environment variables in your shell:
+
+```bash
+env | grep APICENTRIC
+```
+
+## Related pages
+
+- [apicentric.json](/configuration/apicentric-json) - Main configuration file
+- [service.yaml](/configuration/service-yaml) - Service definition format

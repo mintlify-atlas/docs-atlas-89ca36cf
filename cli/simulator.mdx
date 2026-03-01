@@ -1,0 +1,509 @@
+---
+title: simulator
+description: Start, stop, and manage API mock services with the simulator command
+---
+
+The `simulator` command provides complete control over your API mock services, including lifecycle management, monitoring, code generation, and import/export capabilities.
+
+## Subcommands
+
+### start
+
+Start the API simulator and load service definitions.
+
+```bash
+apicentric simulator start [flags]
+```
+
+<ParamField path="--services-dir" type="string" required>
+  Directory containing service definition YAML files
+</ParamField>
+
+<ParamField path="--force" type="boolean" default="false">
+  Force stop any existing simulator before starting
+</ParamField>
+
+<ParamField path="--template" type="string">
+  Install and start a service template from the marketplace
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator start --services-dir ./services
+```
+
+**Example with template:**
+
+```bash
+apicentric simulator start --services-dir ./services --template ecommerce
+```
+
+<Info>
+The simulator runs until you press `Ctrl+C`. All services are started on the ports defined in their YAML files.
+</Info>
+
+### stop
+
+Stop the running API simulator.
+
+```bash
+apicentric simulator stop [flags]
+```
+
+<ParamField path="--force" type="boolean" default="false">
+  Force stop even if services are active
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator stop
+```
+
+### status
+
+Display the current status of the simulator and all services.
+
+```bash
+apicentric simulator status [flags]
+```
+
+<ParamField path="--detailed" type="boolean" default="false">
+  Show detailed information about each service
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator status --detailed
+```
+
+**Sample output:**
+
+```
+📊 API Simulator Status
+   Status: 🟢 Running
+   Services: 3 total
+   Active Services: 3
+
+📋 Service Details:
+   - users (port 9001 base /) endpoints:5 running:yes
+   - orders (port 9002 base /api) endpoints:8 running:yes
+   - products (port 9003 base /) endpoints:12 running:yes
+```
+
+### validate
+
+Validate service definition files for syntax and structure errors.
+
+```bash
+apicentric simulator validate --file <path> [flags]
+```
+
+<ParamField path="--file" type="string" required>
+  Path to a service file or directory to validate
+</ParamField>
+
+<ParamField path="--recursive" type="boolean" default="false">
+  Recursively validate all YAML files in subdirectories
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Show validation details for each file
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator validate --file ./services --recursive --verbose
+```
+
+### logs
+
+Retrieve and filter request logs from a running service.
+
+```bash
+apicentric simulator logs --service <name> [flags]
+```
+
+<ParamField path="--service" type="string" required>
+  Name of the service to fetch logs from
+</ParamField>
+
+<ParamField path="--limit" type="number" default="100">
+  Maximum number of log entries to retrieve
+</ParamField>
+
+<ParamField path="--method" type="string">
+  Filter by HTTP method (GET, POST, PUT, DELETE, etc.)
+</ParamField>
+
+<ParamField path="--route" type="string">
+  Filter by request route/path
+</ParamField>
+
+<ParamField path="--status" type="number">
+  Filter by HTTP status code
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Write logs to a JSON file instead of stdout
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator logs --service users --limit 50 --method POST
+```
+
+**Example with output file:**
+
+```bash
+apicentric simulator logs --service orders --status 500 --output errors.json
+```
+
+### monitor
+
+Continuously monitor simulator status and live request logs.
+
+```bash
+apicentric simulator monitor [flags]
+```
+
+<ParamField path="--service" type="string">
+  Monitor a specific service (monitors all services if omitted)
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Output in JSON format for programmatic processing
+</ParamField>
+
+<ParamField path="--interval" type="number">
+  Refresh interval in seconds (monitors continuously if omitted)
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator monitor --service users --interval 5
+```
+
+<Note>
+Press `Ctrl+C` to stop monitoring.
+</Note>
+
+### set-scenario
+
+Activate a specific scenario across all services.
+
+```bash
+apicentric simulator set-scenario --scenario <name>
+```
+
+<ParamField path="--scenario" type="string" required>
+  Name of the scenario to activate
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator set-scenario --scenario high-latency
+```
+
+### import
+
+Import API definitions from other formats into apicentric service definitions.
+
+```bash
+apicentric simulator import --file <input> --output <output>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the input file (OpenAPI, Postman, WireMock, or Mockoon)
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the converted service definition will be saved
+</ParamField>
+
+**Supported formats:**
+- OpenAPI 3.0 / Swagger 2.0 (JSON or YAML)
+- Postman collections
+- WireMock mappings
+- Mockoon environments
+
+**Example:**
+
+```bash
+apicentric simulator import --file openapi.json --output services/api.yaml
+```
+
+<Info>
+The command auto-detects the input format. If detection fails, it attempts to parse as OpenAPI.
+</Info>
+
+### export
+
+Export service definitions to other formats.
+
+```bash
+apicentric simulator export --file <input> --output <output> --format <format>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the apicentric service definition file
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the exported file will be saved
+</ParamField>
+
+<ParamField path="--format" type="string" required>
+  Export format: `openapi` or `postman`
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator export --file services/users.yaml --output users.json --format openapi
+```
+
+### generate-types
+
+Generate TypeScript type definitions from a service definition.
+
+```bash
+apicentric simulator generate-types --file <input> --output <output>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the service definition YAML file
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the TypeScript file will be saved
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator generate-types --file services/users.yaml --output src/types/users.ts
+```
+
+### generate-query
+
+Generate React Query hooks from a service definition.
+
+```bash
+apicentric simulator generate-query --file <input> --output <output>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the service definition YAML file
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the hooks file will be saved
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator generate-query --file services/users.yaml --output src/hooks/useUsers.ts
+```
+
+### generate-view
+
+Generate a React component view from a service definition.
+
+```bash
+apicentric simulator generate-view --file <input> --output <output>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the service definition YAML file
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the React component will be saved
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator generate-view --file services/users.yaml --output src/views/UsersView.tsx
+```
+
+### new
+
+<Note>
+Requires the `tui` feature to be enabled.
+</Note>
+
+Create a new service definition interactively.
+
+```bash
+apicentric simulator new --output <directory>
+```
+
+<ParamField path="--output" type="string" required>
+  Directory where the service definition will be created
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator new --output ./services
+```
+
+### new-graphql
+
+Create a new GraphQL service definition with schema and mock files.
+
+```bash
+apicentric simulator new-graphql --name <name> --output <directory>
+```
+
+<ParamField path="--name" type="string" required>
+  Name of the GraphQL service
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Directory where the service files will be created
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator new-graphql --name myapi --output ./services
+```
+
+**Generated files:**
+- `myapi.yaml` - Service definition
+- `myapi.gql` - GraphQL schema
+- `helloQuery.json` - Example mock response
+
+### edit
+
+<Note>
+Requires the `tui` feature to be enabled.
+</Note>
+
+Add an endpoint to an existing service definition interactively.
+
+```bash
+apicentric simulator edit --file <path>
+```
+
+<ParamField path="--file" type="string" required>
+  Path to the service definition file
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator edit --file ./services/users.yaml
+```
+
+### record
+
+Record live API traffic and generate a service definition.
+
+```bash
+apicentric simulator record --output <path> [flags]
+```
+
+<ParamField path="--output" type="string" required>
+  Path where the recorded service definition will be saved
+</ParamField>
+
+<ParamField path="--url" type="string" default="http://localhost:8080">
+  Target API URL to record traffic from
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator record --output recorded-api.yaml --url https://api.example.com
+```
+
+### dockerize
+
+Generate a Docker image for your service definitions.
+
+```bash
+apicentric simulator dockerize --file <paths...> --output <directory>
+```
+
+<ParamField path="--file" type="string[]" required>
+  One or more service definition files to include
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Output directory for the Dockerfile and related files
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator dockerize --file services/users.yaml --file services/orders.yaml --output ./docker
+```
+
+**Generated files:**
+- `Dockerfile` - Multi-stage build with apicentric
+- `.dockerignore` - Ignore patterns
+- `services/` - Copied service definitions
+
+### test
+
+<Note>
+Requires the `contract-testing` feature to be enabled.
+</Note>
+
+Run contract tests against a real API.
+
+```bash
+apicentric simulator test --path <contract> --url <api-url> --env <environment> [flags]
+```
+
+<ParamField path="--path" type="string" required>
+  Path to the contract/service definition file
+</ParamField>
+
+<ParamField path="--url" type="string" required>
+  URL of the real API to test against
+</ParamField>
+
+<ParamField path="--env" type="string" required>
+  Environment name for the test run
+</ParamField>
+
+<ParamField path="--quiet" type="boolean" default="false">
+  Minimal output, only show pass/fail summary
+</ParamField>
+
+**Example:**
+
+```bash
+apicentric simulator test --path services/users.yaml --url https://api.production.com --env production
+```
+
+**Example output:**
+
+```
+🚀 Running contract tests...
+   Contract: services/users.yaml
+   API URL:  https://api.production.com
+   Env:      production
+
+🔬 Found 12 test scenarios.
+
+🏁 Contract Test Results:
+   ID:         services/users.yaml
+   Compatible: ✅
+   Score:      98.50%
+   Summary:    11 Passed, 1 Failed
+
+✅ All scenarios passed!
+```

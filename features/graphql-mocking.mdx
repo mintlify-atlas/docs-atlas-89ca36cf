@@ -1,0 +1,521 @@
+---
+title: GraphQL mocking
+description: Mock GraphQL APIs with schema definitions and response templates
+---
+
+Apicentric supports mocking GraphQL APIs alongside REST endpoints. Define GraphQL schemas and operation-specific response templates to simulate GraphQL servers for development and testing.
+
+## What is GraphQL mocking?
+
+GraphQL mocking lets you define a GraphQL schema (SDL) and provide templated responses for specific operations (queries and mutations). When clients send GraphQL requests, Apicentric matches the operation name and returns the corresponding mock response.
+
+### Key capabilities
+
+- **Schema-first design** - Define your GraphQL schema in SDL format
+- **Operation-specific mocks** - Different responses for different queries/mutations
+- **Dynamic templates** - Use Handlebars for realistic data
+- **Schema introspection** - Clients can query your schema
+- **Hybrid APIs** - Combine GraphQL and REST in one service
+
+## Why use GraphQL mocking?
+
+<CardGroup cols={2}>
+  <Card title="Frontend development" icon="code">
+    Build React/Vue apps with Apollo or Relay before the GraphQL backend is ready.
+  </Card>
+  <Card title="API design" icon="pen-ruler">
+    Prototype GraphQL schemas and test query structures before implementation.
+  </Card>
+  <Card title="Testing" icon="vial">
+    Create deterministic GraphQL responses for integration tests.
+  </Card>
+  <Card title="Documentation" icon="book">
+    Provide interactive GraphQL examples for API documentation.
+  </Card>
+</CardGroup>
+
+## Getting started
+
+<Steps>
+  <Step title="Create a GraphQL schema">
+    Define your GraphQL schema in SDL format:
+
+    ```graphql schema.graphql
+    type User {
+      id: ID!
+      name: String!
+      email: String!
+      posts: [Post!]!
+    }
+
+    type Post {
+      id: ID!
+      title: String!
+      content: String!
+      author: User!
+    }
+
+    type Query {
+      user(id: ID!): User
+      users: [User!]!
+      post(id: ID!): Post
+      posts: [Post!]!
+    }
+
+    type Mutation {
+      createUser(name: String!, email: String!): User!
+      createPost(title: String!, content: String!, authorId: ID!): Post!
+    }
+    ```
+  </Step>
+
+  <Step title="Create operation templates">
+    Create templates for each operation:
+
+    ```handlebars user-query.hbs
+    {
+      "data": {
+        "user": {
+          "id": "{{request.body.variables.id}}",
+          "name": "{{faker \"name.fullName\"}}",
+          "email": "{{faker \"internet.email\"}}",
+          "posts": [
+            {
+              "id": "1",
+              "title": "{{faker \"lorem.sentence\"}}",
+              "content": "{{faker \"lorem.paragraphs\"}}"
+            }
+          ]
+        }
+      }
+    }
+    ```
+
+    ```handlebars users-query.hbs
+    {
+      "data": {
+        "users": [
+          {
+            "id": "1",
+            "name": "Alice Johnson",
+            "email": "alice@example.com",
+            "posts": []
+          },
+          {
+            "id": "2",
+            "name": "Bob Smith",
+            "email": "bob@example.com",
+            "posts": []
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Configure the service">
+    Create a service definition with GraphQL configuration:
+
+    ```yaml blog-graphql.yaml
+    name: Blog GraphQL API
+    version: "1.0"
+    description: Mock GraphQL API for blog platform
+    server:
+      port: 9010
+      base_path: /
+
+    graphql:
+      schema_path: ./schema.graphql
+      mocks:
+        user: ./user-query.hbs
+        users: ./users-query.hbs
+        post: ./post-query.hbs
+        posts: ./posts-query.hbs
+        createUser: ./create-user-mutation.hbs
+        createPost: ./create-post-mutation.hbs
+    ```
+  </Step>
+
+  <Step title="Start the server">
+    Start the GraphQL mock server:
+
+    ```bash
+    apicentric simulator start --services-dir .
+    ```
+
+    The GraphQL endpoint is available at `http://localhost:9010/graphql`.
+  </Step>
+
+  <Step title="Test with queries">
+    Send GraphQL queries:
+
+    ```bash
+    curl -X POST http://localhost:9010/graphql \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "query { users { id name email } }"
+      }'
+    ```
+
+    Or use GraphQL clients like Apollo or GraphQL Playground.
+  </Step>
+</Steps>
+
+## Creating a new GraphQL service
+
+Quickly scaffold a GraphQL service:
+
+```bash
+apicentric simulator new-graphql blog-api
+```
+
+This generates:
+- Service definition YAML
+- Sample GraphQL schema
+- Template files for common operations
+
+## GraphQL configuration reference
+
+### Basic configuration
+
+```yaml
+graphql:
+  schema_path: ./schema.graphql  # Path to GraphQL SDL schema
+  
+  mocks:
+    # Map operation names to template files
+    getUser: ./templates/get-user.hbs
+    listUsers: ./templates/list-users.hbs
+    createUser: ./templates/create-user.hbs
+```
+
+### Schema introspection
+
+Clients can query the schema:
+
+```bash
+curl http://localhost:9010/graphql
+```
+
+Returns the full SDL schema for tools like GraphQL Playground.
+
+## Template examples
+
+### Query with variables
+
+```handlebars get-user.hbs
+{
+  "data": {
+    "user": {
+      "id": "{{request.body.variables.id}}",
+      "name": "{{faker \"name.fullName\"}}",
+      "email": "{{faker \"internet.email\"}}",
+      "createdAt": "{{now}}"
+    }
+  }
+}
+```
+
+Handles queries like:
+
+```graphql
+query GetUser($id: ID!) {
+  user(id: $id) {
+    id
+    name
+    email
+    createdAt
+  }
+}
+```
+
+### Mutation response
+
+```handlebars create-user.hbs
+{
+  "data": {
+    "createUser": {
+      "id": "{{faker \"datatype.uuid\"}}",
+      "name": "{{request.body.variables.name}}",
+      "email": "{{request.body.variables.email}}",
+      "createdAt": "{{now}}"
+    }
+  }
+}
+```
+
+Handles mutations like:
+
+```graphql
+mutation CreateUser($name: String!, $email: String!) {
+  createUser(name: $name, email: $email) {
+    id
+    name
+    email
+    createdAt
+  }
+}
+```
+
+### Error responses
+
+```handlebars user-not-found.hbs
+{
+  "errors": [
+    {
+      "message": "User not found",
+      "extensions": {
+        "code": "USER_NOT_FOUND",
+        "userId": "{{request.body.variables.id}}"
+      }
+    }
+  ],
+  "data": {
+    "user": null
+  }
+}
+```
+
+### Nested relationships
+
+```handlebars user-with-posts.hbs
+{
+  "data": {
+    "user": {
+      "id": "{{request.body.variables.id}}",
+      "name": "{{faker \"name.fullName\"}}",
+      "posts": [
+        {
+          "id": "1",
+          "title": "{{faker \"lorem.sentence\"}}",
+          "content": "{{faker \"lorem.paragraphs\"}}",
+          "author": {
+            "id": "{{request.body.variables.id}}",
+            "name": "{{faker \"name.fullName\"}}"
+          }
+        },
+        {
+          "id": "2",
+          "title": "{{faker \"lorem.sentence\"}}",
+          "content": "{{faker \"lorem.paragraphs\"}}",
+          "author": {
+            "id": "{{request.body.variables.id}}",
+            "name": "{{faker \"name.fullName\"}}"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+## Combining GraphQL and REST
+
+You can define both GraphQL and REST endpoints in the same service:
+
+```yaml hybrid-api.yaml
+name: Hybrid API
+version: "1.0"
+server:
+  port: 9011
+  base_path: /api
+
+# GraphQL at /api/graphql
+graphql:
+  schema_path: ./schema.graphql
+  mocks:
+    users: ./users-query.hbs
+
+# REST endpoints
+endpoints:
+  - method: GET
+    path: /health
+    responses:
+      200:
+        body: '{"status": "ok"}'
+  
+  - method: GET
+    path: /version
+    responses:
+      200:
+        body: '{"version": "1.0.0"}'
+```
+
+Access GraphQL at `/api/graphql` and REST at `/api/health`, `/api/version`.
+
+## Client integration
+
+### Apollo Client
+
+```typescript
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
+
+const client = new ApolloClient({
+  uri: 'http://localhost:9010/graphql',
+  cache: new InMemoryCache(),
+});
+
+const GET_USERS = gql`
+  query GetUsers {
+    users {
+      id
+      name
+      email
+    }
+  }
+`;
+
+const { data } = await client.query({ query: GET_USERS });
+console.log(data.users);
+```
+
+### urql
+
+```typescript
+import { createClient } from 'urql';
+
+const client = createClient({
+  url: 'http://localhost:9010/graphql',
+});
+
+const result = await client.query(`
+  query {
+    users {
+      id
+      name
+    }
+  }
+`).toPromise();
+
+console.log(result.data.users);
+```
+
+### Relay
+
+```typescript
+import { Environment, Network, RecordSource, Store } from 'relay-runtime';
+
+const network = Network.create((operation, variables) =>
+  fetch('http://localhost:9010/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: operation.text, variables }),
+  }).then(response => response.json())
+);
+
+const environment = new Environment({
+  network,
+  store: new Store(new RecordSource()),
+});
+```
+
+## Complete example: E-commerce GraphQL API
+
+```graphql ecommerce-schema.graphql
+type Product {
+  id: ID!
+  name: String!
+  price: Float!
+  description: String
+  category: Category!
+}
+
+type Category {
+  id: ID!
+  name: String!
+  products: [Product!]!
+}
+
+type CartItem {
+  product: Product!
+  quantity: Int!
+}
+
+type Cart {
+  items: [CartItem!]!
+  total: Float!
+}
+
+type Query {
+  products(category: String): [Product!]!
+  product(id: ID!): Product
+  categories: [Category!]!
+  cart: Cart!
+}
+
+type Mutation {
+  addToCart(productId: ID!, quantity: Int!): Cart!
+  removeFromCart(productId: ID!): Cart!
+}
+```
+
+```yaml ecommerce-graphql.yaml
+name: E-commerce GraphQL API
+version: "1.0"
+server:
+  port: 9012
+
+graphql:
+  schema_path: ./ecommerce-schema.graphql
+  mocks:
+    products: ./products-query.hbs
+    product: ./product-query.hbs
+    categories: ./categories-query.hbs
+    cart: ./cart-query.hbs
+    addToCart: ./add-to-cart-mutation.hbs
+    removeFromCart: ./remove-from-cart-mutation.hbs
+```
+
+```handlebars products-query.hbs
+{
+  "data": {
+    "products": [
+      {
+        "id": "1",
+        "name": "Laptop Pro",
+        "price": 1299.99,
+        "description": "High-performance laptop",
+        "category": {
+          "id": "1",
+          "name": "Electronics"
+        }
+      },
+      {
+        "id": "2",
+        "name": "Wireless Mouse",
+        "price": 29.99,
+        "description": "Ergonomic wireless mouse",
+        "category": {
+          "id": "1",
+          "name": "Electronics"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Tips and best practices
+
+<Tip>
+Use the same operation names in your `mocks` configuration as defined in your GraphQL queries and mutations.
+</Tip>
+
+<Tip>
+Enable GraphQL Playground or GraphiQL by accessing the `/graphql` endpoint in a browser for interactive testing.
+</Tip>
+
+<Note>
+GraphQL mocking requires the `graphql` feature. Most installations include this by default.
+</Note>
+
+<Warning>
+GraphQL schema validation is performed at startup. Fix any schema errors before the service can start.
+</Warning>
+
+## Next steps
+
+- Learn about [API simulator](/features/api-simulator) for REST endpoint mocking
+- Generate [TypeScript types](/features/code-generation) from your GraphQL schema
+- Use [contract testing](/features/contract-testing) to validate GraphQL mocks
+- Monitor GraphQL requests with the [TUI](/features/tui)

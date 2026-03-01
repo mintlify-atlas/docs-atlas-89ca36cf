@@ -1,0 +1,169 @@
+---
+title: ai
+description: Generate API service definitions using artificial intelligence
+---
+
+The `ai` command uses OpenAI's language models to generate service definitions from natural language descriptions.
+
+## Prerequisites
+
+You must set the `OPENAI_API_KEY` environment variable:
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+<Warning>
+The AI command requires a valid OpenAI API key. You'll receive a 401 error if the key is missing or invalid.
+</Warning>
+
+## generate
+
+Generate a service definition from a natural language prompt.
+
+```bash
+apicentric ai generate --prompt <description>
+```
+
+<ParamField path="--prompt" type="string" required>
+  Natural language description of the API service you want to create
+</ParamField>
+
+## Usage examples
+
+### Simple REST API
+
+```bash
+apicentric ai generate --prompt "Create a user management API with CRUD endpoints"
+```
+
+### E-commerce API
+
+```bash
+apicentric ai generate --prompt "Build an e-commerce API with products, cart, and checkout endpoints"
+```
+
+### Specific requirements
+
+```bash
+apicentric ai generate --prompt "Create a blog API with posts, comments, and authors. Include pagination and filtering."
+```
+
+## How it works
+
+1. **Prompt processing**: Your description is sent to OpenAI's API
+2. **Service generation**: The AI generates a complete service definition in YAML format
+3. **Auto-apply**: If the simulator is running, the service is automatically applied
+4. **Output**: The generated YAML is displayed or applied to the simulator
+
+## Output behavior
+
+### With simulator running
+
+The generated service is automatically applied:
+
+```bash
+$ apicentric ai generate --prompt "user API with login and registration"
+
+🤖 Generating service from: "user API with login and registration"...
+✅ Generated service 'users' applied to simulator
+```
+
+### Without simulator
+
+The YAML is printed to stdout:
+
+```bash
+$ apicentric ai generate --prompt "simple todo API"
+
+🤖 Generating service from: "simple todo API"...
+name: todos
+version: 1.0.0
+server:
+  port: 9001
+  base_path: /
+endpoints:
+  - path: /todos
+    method: GET
+    ...
+```
+
+## Error handling
+
+### Missing API key
+
+```
+❌ Authentication Failed: Missing or invalid OPENAI_API_KEY
+👉 Please set the OPENAI_API_KEY environment variable to use AI features.
+   Example: export OPENAI_API_KEY=sk-...
+```
+
+### Generation failure
+
+```
+❌ AI Generation Failed: <error details>
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Be specific" icon="bullseye">
+    Include details about endpoints, data models, and behavior
+  </Card>
+  
+  <Card title="Use examples" icon="list">
+    Mention specific endpoints or data structures you need
+  </Card>
+  
+  <Card title="Iterate" icon="rotate">
+    Generate, review, and refine your prompts for better results
+  </Card>
+  
+  <Card title="Combine with editing" icon="pen">
+    Use generated services as a starting point and manually refine them
+  </Card>
+</CardGroup>
+
+## Dry run mode
+
+Test the command without making API calls:
+
+```bash
+apicentric --dry-run ai generate --prompt "user API"
+```
+
+Output:
+```
+🏃 Dry run: Would generate service from prompt: user API
+```
+
+## Tips for better results
+
+### Good prompts
+
+```bash
+# Detailed with structure
+apicentric ai generate --prompt "Create a task management API with users, projects, and tasks. Include authentication endpoints."
+
+# Specific data models
+apicentric ai generate --prompt "Build a book API where books have title, author, ISBN, and publication year"
+
+# Include behaviors
+apicentric ai generate --prompt "Create a weather API with endpoints for current weather and 5-day forecast, including error scenarios"
+```
+
+### Prompts to avoid
+
+```bash
+# Too vague
+apicentric ai generate --prompt "API"
+
+# Conflicting requirements
+apicentric ai generate --prompt "Create both a REST and GraphQL service"
+```
+
+## Next steps
+
+- Save generated YAML to a file: `apicentric ai generate --prompt "..." > service.yaml`
+- Edit generated services with `apicentric simulator edit`
+- Start the simulator with `apicentric simulator start`

@@ -1,0 +1,387 @@
+---
+title: CI/CD integration
+description: Learn how to integrate Apicentric into your CI/CD pipelines for automated testing and validation
+---
+
+Integrate Apicentric into your CI/CD workflows to automatically test API contracts, validate service definitions, and ensure consistency across your development pipeline.
+
+## GitHub Actions integration
+
+Apicentric works seamlessly with GitHub Actions for continuous integration and testing.
+
+### Basic CI workflow
+
+Create a `.github/workflows/api-tests.yml` file in your repository:
+
+```yaml
+name: API Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+  test-api-contracts:
+    name: Test API Contracts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Apicentric
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
+      
+      - name: Verify installation
+        run: apicentric --version
+      
+      - name: Start mock services
+        run: apicentric simulator start --services-dir ./services &
+      
+      - name: Wait for services
+        run: sleep 5
+      
+      - name: Run contract tests
+        run: apicentric contract test --spec ./services/user-api.yaml
+```
+
+<Note>
+The `&` at the end of the start command runs the simulator in the background, allowing subsequent steps to execute.
+</Note>
+
+### Multi-platform testing
+
+Test your API mocks across different operating systems:
+
+```yaml
+jobs:
+  test:
+    name: Test API Services
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Apicentric (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+          echo "/usr/local/bin" >> $GITHUB_PATH
+      
+      - name: Install Apicentric (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          irm https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.ps1 | iex
+      
+      - name: Run tests
+        run: apicentric simulator start --services-dir ./services
+```
+
+### Service validation workflow
+
+Validate service definitions before merging:
+
+<Steps>
+  <Step title="Create validation workflow">
+    Add a workflow that validates all YAML service definitions:
+    
+    ```yaml
+    name: Validate Services
+    
+    on:
+      pull_request:
+        paths:
+          - 'services/**/*.yaml'
+    
+    jobs:
+      validate:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          
+          - name: Install Apicentric
+            run: |
+              curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+          
+          - name: Validate service definitions
+            run: |
+              for file in services/*.yaml; do
+                echo "Validating $file"
+                apicentric simulator validate --file "$file"
+              done
+    ```
+  </Step>
+  
+  <Step title="Add contract testing">
+    Run contract tests against real APIs to ensure mocks stay in sync:
+    
+    ```yaml
+    - name: Test contracts
+      env:
+        API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      run: |
+        apicentric contract test \
+          --spec ./services/user-api.yaml \
+          --real-url $API_BASE_URL
+    ```
+  </Step>
+  
+  <Step title="Generate reports">
+    Upload test results as artifacts:
+    
+    ```yaml
+    - name: Upload test reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: contract-test-reports
+        path: ./reports/*.html
+    ```
+  </Step>
+</Steps>
+
+## GitLab CI integration
+
+Integrate Apicentric into GitLab pipelines with `.gitlab-ci.yml`:
+
+```yaml
+stages:
+  - validate
+  - test
+  - deploy
+
+variables:
+  APICENTRIC_VERSION: "latest"
+
+before_script:
+  - curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+  - export PATH="/usr/local/bin:$PATH"
+
+validate-services:
+  stage: validate
+  script:
+    - apicentric simulator validate --file services/*.yaml
+  only:
+    changes:
+      - services/**/*.yaml
+
+test-contracts:
+  stage: test
+  script:
+    - apicentric simulator start --services-dir ./services &
+    - sleep 5
+    - apicentric contract test --spec ./services/user-api.yaml
+  artifacts:
+    reports:
+      junit: reports/contract-tests.xml
+    paths:
+      - reports/
+```
+
+## Docker-based CI
+
+Use Apicentric's Docker images in your pipeline:
+
+<CodeGroup>
+```yaml GitHub Actions
+steps:
+  - name: Run tests with Docker
+    run: |
+      docker run -d \
+        -v $(pwd)/services:/app/services \
+        -p 8080:8080 \
+        apicentric/apicentric:latest \
+        simulator start --services-dir /app/services
+      
+      sleep 5
+      curl http://localhost:8080/health
+```
+
+```yaml GitLab CI
+test-with-docker:
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker run -d -v $(pwd)/services:/app/services -p 8080:8080 apicentric/apicentric
+    - sleep 5
+    - curl http://localhost:8080/health
+```
+</CodeGroup>
+
+## Integration testing workflow
+
+Combine Apicentric with your integration tests:
+
+<Steps>
+  <Step title="Start mock services">
+    Launch all required API mocks before running tests:
+    
+    ```yaml
+    - name: Start mock backend
+      run: |
+        apicentric simulator start --services-dir ./mocks &
+        echo $! > simulator.pid
+    ```
+  </Step>
+  
+  <Step title="Run integration tests">
+    Execute your test suite against the mocks:
+    
+    ```yaml
+    - name: Run integration tests
+      run: |
+        npm run test:integration
+    ```
+  </Step>
+  
+  <Step title="Collect logs and cleanup">
+    Gather logs and shut down services:
+    
+    ```yaml
+    - name: Stop simulator
+      if: always()
+      run: |
+        kill $(cat simulator.pid) || true
+    
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: simulator-logs
+        path: ./logs/
+    ```
+  </Step>
+</Steps>
+
+## Release automation
+
+Automate service deployment using Apicentric's dockerize feature:
+
+```yaml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Apicentric
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+      
+      - name: Dockerize services
+        run: |
+          apicentric simulator dockerize \
+            --file services/user-api.yaml \
+            --file services/products-api.yaml \
+            --output ./docker-build
+      
+      - name: Build Docker image
+        run: |
+          cd docker-build
+          docker build -t mycompany/mock-apis:${{ github.ref_name }} .
+      
+      - name: Push to registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push mycompany/mock-apis:${{ github.ref_name }}
+```
+
+<Tip>
+Use GitHub's built-in `GITHUB_TOKEN` for authentication when pushing to GitHub Container Registry instead of managing separate credentials.
+</Tip>
+
+## Best practices
+
+### Cache dependencies
+
+Speed up your CI builds by caching Apicentric binaries:
+
+```yaml
+- name: Cache Apicentric
+  uses: actions/cache@v4
+  with:
+    path: /usr/local/bin/apicentric
+    key: ${{ runner.os }}-apicentric-${{ env.APICENTRIC_VERSION }}
+```
+
+### Parallel execution
+
+Run multiple service tests in parallel for faster feedback:
+
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        service: [users, products, orders]
+    steps:
+      - name: Test ${{ matrix.service }} service
+        run: |
+          apicentric simulator start --file services/${{ matrix.service }}.yaml &
+          npm test -- ${{ matrix.service }}
+```
+
+### Environment-specific configs
+
+Use different service configurations per environment:
+
+```yaml
+- name: Start services for staging
+  if: github.ref == 'refs/heads/develop'
+  run: apicentric simulator start --services-dir ./services/staging
+
+- name: Start services for production
+  if: github.ref == 'refs/heads/main'
+  run: apicentric simulator start --services-dir ./services/production
+```
+
+<Warning>
+Always validate service definitions before deploying to prevent runtime errors in your CI pipeline.
+</Warning>
+
+## Troubleshooting CI issues
+
+### Services not starting
+
+If services fail to start in CI:
+
+1. Check port availability
+2. Increase wait time after starting services
+3. Verify YAML syntax with `apicentric simulator validate`
+4. Check CI logs for detailed error messages
+
+### Contract tests failing
+
+When contract tests fail:
+
+- Ensure the real API is accessible from CI environment
+- Check authentication credentials in secrets
+- Verify network connectivity and firewall rules
+- Review HTML reports for detailed diff information
+
+### Performance issues
+
+Optimize slow CI builds:
+
+- Use minimal feature builds: `--no-default-features --features minimal`
+- Cache binaries and dependencies
+- Run tests in parallel using matrix strategies
+- Use Docker images instead of installing from source

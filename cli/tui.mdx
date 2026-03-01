@@ -1,0 +1,276 @@
+---
+title: tui
+description: Launch an interactive terminal dashboard for real-time service monitoring
+---
+
+<Note>
+The `tui` command requires the `tui` feature to be enabled during installation.
+</Note>
+
+The terminal user interface (TUI) provides an interactive dashboard for managing services and viewing logs in real-time.
+
+## Usage
+
+```bash
+apicentric tui
+```
+
+No additional flags are required. The TUI initializes the simulator automatically.
+
+## Interface overview
+
+The TUI is divided into three main panels:
+
+### 1. Services panel (left)
+
+- Lists all loaded services
+- Shows service status (running/stopped)
+- Displays port and base path information
+- Navigate with `↑`/`↓` arrow keys
+
+### 2. Logs panel (center)
+
+- Real-time request log streaming
+- Shows method, path, status code, and timestamp
+- Automatic scrolling for new entries
+- Search and filter capabilities
+
+### 3. Actions panel (right)
+
+- Quick actions for selected service
+- Performance metrics
+- Keyboard shortcuts reference
+- Service control buttons
+
+### Header
+
+- Application title and version
+- Current mode indicator
+- System status
+
+## Keyboard shortcuts
+
+### Navigation
+
+<ParamField path="Tab" type="key">
+  Switch between panels
+</ParamField>
+
+<ParamField path="↑ / ↓" type="key">
+  Navigate within lists
+</ParamField>
+
+<ParamField path="Page Up / Page Down" type="key">
+  Scroll through logs
+</ParamField>
+
+### Actions
+
+<ParamField path="s" type="key">
+  Start selected service
+</ParamField>
+
+<ParamField path="x" type="key">
+  Stop selected service
+</ParamField>
+
+<ParamField path="r" type="key">
+  Restart selected service
+</ParamField>
+
+<ParamField path="l" type="key">
+  Clear logs
+</ParamField>
+
+### Views
+
+<ParamField path="d" type="key">
+  Toggle dashboard view
+</ParamField>
+
+<ParamField path="e" type="key">
+  Open endpoint explorer
+</ParamField>
+
+<ParamField path="c" type="key">
+  Open configuration view
+</ParamField>
+
+<ParamField path="m" type="key">
+  Open marketplace dialog
+</ParamField>
+
+### Filtering
+
+<ParamField path="f" type="key">
+  Open filter dialog for logs
+</ParamField>
+
+<ParamField path="/" type="key">
+  Open search dialog
+</ParamField>
+
+### System
+
+<ParamField path="?" type="key">
+  Show help dialog
+</ParamField>
+
+<ParamField path="q or Ctrl+C" type="key">
+  Quit the TUI
+</ParamField>
+
+## Features
+
+### Real-time monitoring
+
+The TUI updates service status and logs every second:
+
+- **Service status**: Automatically reflects starts, stops, and crashes
+- **Request logs**: New requests appear instantly in the logs panel
+- **Metrics**: Request counts and performance stats update live
+
+### Dashboard view
+
+Press `d` to toggle the dashboard view, which shows:
+
+- Total requests over time
+- Request rate sparklines
+- Error rate trends
+- Service health indicators
+- Response time distributions
+
+### Endpoint explorer
+
+Press `e` to explore and test endpoints:
+
+1. Select an endpoint from the list
+2. View request/response schemas
+3. Send test requests
+4. See results inline
+
+### Log filtering
+
+Press `f` to open the filter dialog:
+
+- Filter by HTTP method (GET, POST, etc.)
+- Filter by status code range
+- Filter by path pattern
+- Combine multiple filters
+
+### Search
+
+Press `/` to search through logs:
+
+- Search request paths
+- Search response bodies
+- Navigate between matches with `n` (next) and `N` (previous)
+
+### Marketplace
+
+Press `m` to browse and install service templates:
+
+1. Browse available templates
+2. Preview template contents
+3. Install directly into your services directory
+
+## Performance metrics
+
+The actions panel displays performance information:
+
+- **Average input latency**: Response time for keyboard input
+- **Max input latency**: Worst-case input lag
+- **Render time**: UI refresh duration
+- **Loop time**: Main event loop duration
+
+<Info>
+The TUI is optimized to maintain sub-100ms input latency even with hundreds of log entries.
+</Info>
+
+## Configuration view
+
+Press `c` to view and edit configuration:
+
+- Service definitions
+- Port assignments
+- Scenario settings
+- Behavior rules
+
+## Graceful shutdown
+
+When you quit the TUI:
+
+1. Terminal is restored to normal mode
+2. Cursor visibility is restored
+3. Alternate screen buffer is released
+4. No artifacts left in your terminal
+
+## Troubleshooting
+
+### Terminal not supported
+
+```
+❌ Failed to initialize terminal: ...
+💡 Ensure your terminal supports alternate screen mode
+```
+
+**Solution**: Use a modern terminal emulator like iTerm2, Alacritty, or Windows Terminal.
+
+### Raw mode error
+
+```
+❌ Failed to enable raw mode: ...
+💡 Try running in a different terminal or check terminal permissions
+```
+
+**Solution**: Check that your terminal is not in a restricted environment (like some CI systems).
+
+### Terminal too small
+
+```
+❌ Render error: ...
+💡 Terminal size may be too small. Try resizing your terminal window
+```
+
+**Solution**: Resize your terminal to at least 80x24 characters.
+
+### Cursor still hidden after exit
+
+**Solution**: Run `tput cnorm` to manually restore cursor visibility.
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Monitor during development" icon="eye">
+    Keep the TUI open while developing to see API requests in real-time
+  </Card>
+  
+  <Card title="Use filters" icon="filter">
+    Filter logs by status code to quickly find errors
+  </Card>
+  
+  <Card title="Test with endpoint explorer" icon="flask">
+    Verify endpoint behavior without leaving the terminal
+  </Card>
+  
+  <Card title="Check metrics" icon="chart-line">
+    Monitor performance metrics to ensure responsiveness
+  </Card>
+</CardGroup>
+
+## Comparison with other commands
+
+| Feature | TUI | `simulator start` | `simulator monitor` |
+|---------|-----|-------------------|---------------------|
+| Real-time logs | ✅ | ❌ | ✅ |
+| Interactive | ✅ | ❌ | ❌ |
+| Service control | ✅ | ❌ | ❌ |
+| Filtering | ✅ | ❌ | ❌ |
+| Dashboard | ✅ | ❌ | ❌ |
+| Background mode | ❌ | ✅ | ❌ |
+
+## Next steps
+
+- Learn about service definitions in the [Configuration guide](/configuration/services)
+- Explore the [Dashboard features](/features/dashboard)
+- Set up [keyboard customization](/configuration/keybindings)

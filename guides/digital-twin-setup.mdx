@@ -1,0 +1,645 @@
+---
+title: Digital twin setup
+description: Create and run IoT device simulations with realistic physics and multiple protocol support
+---
+
+Digital twins are virtual representations of physical IoT devices. Apicentric lets you simulate sensor data, control actuators, and test IoT systems without physical hardware.
+
+## What are digital twins
+
+A digital twin simulates:
+- **Sensor readings**: Temperature, humidity, pressure, motion
+- **Physical behavior**: Realistic data patterns using physics models
+- **Protocol adapters**: MQTT, Modbus TCP, OPC-UA, HTTP
+- **State management**: Device status, errors, configuration
+
+## Quick start
+
+Create a simple temperature sensor:
+
+```yaml twins/temperature-sensor.yaml
+twin:
+  name: temperature-sensor
+  physics:
+    - variable: temperature
+      strategy: sine
+      params:
+        min: 20.0
+        max: 30.0
+        frequency: 0.1
+  transports:
+    - type: mqtt
+      params:
+        broker: mqtt://localhost:1883
+        topic: sensors/temp/readings
+        interval_ms: 5000
+```
+
+<Steps>
+
+### Start an MQTT broker (optional)
+
+```bash
+docker run -d -p 1883:1883 eclipse-mosquitto
+```
+
+### Run the twin
+
+```bash
+apicentric twin run --device twins/temperature-sensor.yaml
+```
+
+### Subscribe to messages
+
+```bash
+mosquitto_sub -h localhost -t "sensors/temp/readings"
+```
+
+You'll see readings published every 5 seconds:
+
+```json
+{"temperature": 25.3, "timestamp": "2024-03-01T10:30:00Z"}
+{"temperature": 26.1, "timestamp": "2024-03-01T10:30:05Z"}
+{"temperature": 27.5, "timestamp": "2024-03-01T10:30:10Z"}
+```
+
+</Steps>
+
+## Physics strategies
+
+Apicentric supports multiple simulation strategies:
+
+### Sine wave
+
+Smooth oscillating values (ideal for temperature, pressure):
+
+```yaml
+physics:
+  - variable: temperature
+    strategy: sine
+    params:
+      min: 15.0
+      max: 35.0
+      frequency: 0.05  # Hz (cycles per second)
+```
+
+### Noise sine
+
+Sine wave with random noise (more realistic):
+
+```yaml
+physics:
+  - variable: temperature
+    strategy: noise_sine
+    params:
+      min: 18.0
+      max: 28.0
+      frequency: 0.1
+      noise_amplitude: 2.0
+```
+
+### Script-based
+
+Custom logic using Rhai scripting:
+
+```yaml
+physics:
+  - variable: temperature
+    strategy: script
+    params:
+      code: |
+        let base = 25.0;
+        let variation = rand_range(-5.0, 5.0);
+        base + variation
+```
+
+### Replay from file
+
+Replay recorded sensor data:
+
+```yaml
+physics:
+  - variable: temperature
+    strategy: replay
+    params:
+      file: recordings/temp-sensor-data.csv
+      loop: true
+```
+
+Format of `temp-sensor-data.csv`:
+
+```csv
+timestamp,temperature
+2024-03-01T10:00:00Z,22.5
+2024-03-01T10:01:00Z,23.1
+2024-03-01T10:02:00Z,23.7
+```
+
+## Protocol adapters
+
+### MQTT
+
+Publish sensor data via MQTT:
+
+```yaml
+twin:
+  name: smart-thermostat
+  physics:
+    - variable: temperature
+      strategy: sine
+      params:
+        min: 20.0
+        max: 25.0
+    - variable: humidity
+      strategy: sine
+      params:
+        min: 40.0
+        max: 60.0
+  transports:
+    - type: mqtt
+      params:
+        broker: mqtt://mqtt.example.com:1883
+        topic: home/living-room/climate
+        interval_ms: 10000
+        qos: 1
+        retain: true
+        username: sensor_user
+        password: ${MQTT_PASSWORD}
+```
+
+### Modbus TCP
+
+Expose data via Modbus TCP registers:
+
+```yaml
+twin:
+  name: industrial-pump
+  physics:
+    - variable: flow_rate
+      strategy: sine
+      params:
+        min: 0.0
+        max: 100.0
+    - variable: pressure
+      strategy: sine
+      params:
+        min: 0.0
+        max: 10.0
+  transports:
+    - type: modbus
+      params:
+        port: 5020
+        unit_id: 1
+        registers:
+          - address: 0
+            variable: flow_rate
+            type: float
+          - address: 2
+            variable: pressure
+            type: float
+```
+
+Read with Modbus client:
+
+```bash
+# Using pymodbus
+from pymodbus.client import ModbusTcpClient
+
+client = ModbusTcpClient('localhost', port=5020)
+result = client.read_holding_registers(0, 4, unit=1)
+print(f"Flow rate: {result.registers[0:2]}")
+print(f"Pressure: {result.registers[2:4]}")
+```
+
+## Multi-sensor device
+
+Simulate a device with multiple sensors:
+
+```yaml twins/weather-station.yaml
+twin:
+  name: weather-station
+  physics:
+    - variable: temperature
+      strategy: noise_sine
+      params:
+        min: 15.0
+        max: 30.0
+        frequency: 0.02
+        noise_amplitude: 1.5
+    
+    - variable: humidity
+      strategy: noise_sine
+      params:
+        min: 40.0
+        max: 80.0
+        frequency: 0.03
+        noise_amplitude: 3.0
+    
+    - variable: pressure
+      strategy: sine
+      params:
+        min: 980.0
+        max: 1020.0
+        frequency: 0.01
+    
+    - variable: wind_speed
+      strategy: script
+      params:
+        code: |
+          let base = 5.0;
+          let gust = rand_range(0.0, 10.0);
+          base + gust
+    
+    - variable: rain
+      strategy: script
+      params:
+        code: |
+          if rand() < 0.3 { rand_range(0.0, 5.0) } else { 0.0 }
+  
+  transports:
+    - type: mqtt
+      params:
+        broker: mqtt://localhost:1883
+        topic: weather/station-01
+        interval_ms: 30000
+        payload_template: |
+          {
+            "station_id": "station-01",
+            "temperature_c": {{temperature}},
+            "humidity_percent": {{humidity}},
+            "pressure_hpa": {{pressure}},
+            "wind_speed_kmh": {{wind_speed}},
+            "rain_mm": {{rain}},
+            "timestamp": "{{timestamp}}"
+          }
+```
+
+## Real-world examples
+
+### Industrial temperature sensor
+
+```yaml twins/industrial/temp-sensor.yaml
+twin:
+  name: temp-sensor-zone-a
+  physics:
+    - variable: temperature
+      strategy: noise_sine
+      params:
+        min: 60.0
+        max: 85.0
+        frequency: 0.05
+        noise_amplitude: 2.0
+  transports:
+    - type: modbus
+      params:
+        port: 5020
+        unit_id: 10
+        registers:
+          - address: 0
+            variable: temperature
+            type: float
+```
+
+### Smart home thermostat
+
+```yaml twins/smarthome/thermostat.yaml
+twin:
+  name: nest-thermostat
+  physics:
+    - variable: current_temp
+      strategy: sine
+      params:
+        min: 19.0
+        max: 23.0
+        frequency: 0.02
+    - variable: target_temp
+      strategy: script
+      params:
+        code: "21.0"  # Constant target
+    - variable: humidity
+      strategy: sine
+      params:
+        min: 40.0
+        max: 55.0
+  transports:
+    - type: mqtt
+      params:
+        broker: mqtt://localhost:1883
+        topic: home/thermostat
+        interval_ms: 60000
+        subscriptions:
+          - home/thermostat/set_target
+```
+
+### Solar inverter
+
+```yaml twins/energy/solar-inverter.yaml
+twin:
+  name: solar-inverter-01
+  physics:
+    - variable: dc_voltage
+      strategy: sine
+      params:
+        min: 300.0
+        max: 500.0
+        frequency: 0.01
+    - variable: dc_current
+      strategy: script
+      params:
+        code: |
+          let hour = time().hour;
+          if hour >= 6 && hour <= 18 {
+            let peak = 15.0;
+            peak * sin((hour - 6.0) / 12.0 * PI)
+          } else {
+            0.0
+          }
+    - variable: ac_power
+      strategy: script
+      params:
+        code: "dc_voltage * dc_current * 0.95"
+  transports:
+    - type: modbus
+      params:
+        port: 5021
+        unit_id: 1
+```
+
+### GPS tracker
+
+```yaml twins/automotive/gps-tracker.yaml
+twin:
+  name: vehicle-tracker-001
+  physics:
+    - variable: latitude
+      strategy: script
+      params:
+        code: |
+          37.7749 + rand_range(-0.01, 0.01)
+    - variable: longitude
+      strategy: script
+      params:
+        code: |
+          -122.4194 + rand_range(-0.01, 0.01)
+    - variable: speed_kmh
+      strategy: sine
+      params:
+        min: 0.0
+        max: 80.0
+        frequency: 0.05
+  transports:
+    - type: mqtt
+      params:
+        broker: mqtt://fleet.example.com:1883
+        topic: fleet/vehicles/001/location
+        interval_ms: 5000
+```
+
+## Running multiple twins
+
+Simulate a fleet of devices:
+
+```bash
+#!/bin/bash
+# start-fleet.sh
+
+for i in {1..10}; do
+  apicentric twin run \
+    --device twins/sensor-${i}.yaml \
+    &
+done
+
+wait
+```
+
+Or use Docker Compose:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto
+    ports:
+      - "1883:1883"
+  
+  sensor-1:
+    image: apicentric/apicentric
+    command: twin run --device /twins/sensor-1.yaml
+    volumes:
+      - ./twins:/twins
+    depends_on:
+      - mqtt-broker
+  
+  sensor-2:
+    image: apicentric/apicentric
+    command: twin run --device /twins/sensor-2.yaml
+    volumes:
+      - ./twins:/twins
+    depends_on:
+      - mqtt-broker
+  
+  sensor-3:
+    image: apicentric/apicentric
+    command: twin run --device /twins/sensor-3.yaml
+    volumes:
+      - ./twins:/twins
+    depends_on:
+      - mqtt-broker
+```
+
+Start all:
+
+```bash
+docker-compose up -d
+```
+
+## Testing IoT applications
+
+Use digital twins to test your IoT applications:
+
+```python test_iot_app.py
+import pytest
+import subprocess
+import time
+from paho.mqtt import client as mqtt_client
+
+def start_twin():
+    """Start a digital twin for testing"""
+    proc = subprocess.Popen([
+        'apicentric', 'twin', 'run',
+        '--device', 'twins/test-sensor.yaml'
+    ])
+    time.sleep(2)  # Wait for startup
+    return proc
+
+def test_sensor_publishes_data():
+    """Test that sensor publishes data to MQTT"""
+    twin = start_twin()
+    
+    received_messages = []
+    
+    def on_message(client, userdata, msg):
+        received_messages.append(msg.payload.decode())
+    
+    client = mqtt_client.Client()
+    client.on_message = on_message
+    client.connect('localhost', 1883)
+    client.subscribe('sensors/test/readings')
+    client.loop_start()
+    
+    time.sleep(10)  # Wait for messages
+    
+    assert len(received_messages) > 0
+    assert 'temperature' in received_messages[0]
+    
+    client.loop_stop()
+    twin.terminate()
+```
+
+## Monitoring twins
+
+Enable logging to see twin activity:
+
+```bash
+apicentric twin run \
+  --device twins/sensor.yaml \
+  --verbose
+```
+
+Output:
+
+```
+🚀 Starting Digital Twin: temperature-sensor
+📡 Connecting to MQTT broker: mqtt://localhost:1883
+✅ Connected to MQTT broker
+📤 Published to sensors/temp/readings: {"temperature": 25.3}
+📤 Published to sensors/temp/readings: {"temperature": 26.1}
+```
+
+## Best practices
+
+<Steps>
+
+### Use realistic physics
+
+Choose strategies that match real sensor behavior:
+- Temperature: `noise_sine` (slow changes with noise)
+- Motion: `script` (discrete on/off states)
+- GPS: `script` (gradual position changes)
+
+### Set appropriate intervals
+
+Match real device update rates:
+- Industrial sensors: 1-10 seconds
+- Smart home: 30-60 seconds
+- GPS trackers: 5-15 seconds
+- Weather stations: 5-10 minutes
+
+### Include error states
+
+Simulate device errors:
+
+```yaml
+physics:
+  - variable: status
+    strategy: script
+    params:
+      code: |
+        if rand() < 0.05 { "error" } else { "ok" }
+```
+
+### Version your twins
+
+Track device firmware versions:
+
+```yaml
+twin:
+  name: sensor-v2
+  version: "2.1.0"
+  metadata:
+    firmware_version: "2.1.0"
+    model: "TEMP-5000"
+```
+
+### Use environment variables
+
+Avoid hardcoding credentials:
+
+```yaml
+transports:
+  - type: mqtt
+    params:
+      broker: ${MQTT_BROKER}
+      username: ${MQTT_USER}
+      password: ${MQTT_PASSWORD}
+```
+
+</Steps>
+
+## Troubleshooting
+
+### Twin fails to start
+
+Check YAML syntax:
+
+```bash
+yamlcheck twins/sensor.yaml
+```
+
+### No data published
+
+Verify broker connectivity:
+
+```bash
+mosquitto_pub -h localhost -t test -m "hello"
+mosquitto_sub -h localhost -t test
+```
+
+### Modbus connection refused
+
+Check port availability:
+
+```bash
+lsof -i :5020
+```
+
+### Physics produces unexpected values
+
+Test strategy in isolation:
+
+```yaml
+physics:
+  - variable: test
+    strategy: script
+    params:
+      code: |
+        print("Debug: " + rand());
+        42.0
+```
+
+<Warning>
+Digital twins generate continuous data. For production testing, use appropriate sampling rates and data retention policies to avoid overwhelming your systems.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Contract testing" icon="check-double" href="/guides/contract-testing-workflow">
+  Validate IoT APIs with contract tests
+</Card>
+
+<Card title="Dockerizing services" icon="docker" href="/guides/dockerizing-services">
+  Run twins in Docker containers
+</Card>
+
+<Card title="Creating mocks" icon="wand-magic-sparkles" href="/guides/creating-mock-apis">
+  Build HTTP APIs for IoT gateways
+</Card>
+
+<Card title="Request recording" icon="record-vinyl" href="/guides/request-recording">
+  Record real device data for replay
+</Card>
+
+</CardGroup>

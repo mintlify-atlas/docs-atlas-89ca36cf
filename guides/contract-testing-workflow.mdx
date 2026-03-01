@@ -1,0 +1,522 @@
+---
+title: Contract testing workflow
+description: Validate that your mock APIs match real API implementations using automated contract testing
+---
+
+Contract testing ensures your mock APIs stay synchronized with real implementations. Apicentric validates request/response schemas, status codes, and data formats, catching breaking changes before they reach production.
+
+## Why contract testing
+
+- **Prevent breaking changes**: Catch API mismatches before deployment
+- **Documentation validation**: Ensure specs match reality
+- **Team alignment**: Keep frontend and backend in sync
+- **Confident refactoring**: Know when changes break contracts
+- **CI/CD integration**: Automate validation in pipelines
+
+## How it works
+
+<Steps>
+
+### Create mock service
+
+Define your expected API behavior in YAML.
+
+### Register contract
+
+Register the service as a contract to test against.
+
+### Run comparison
+
+Apicentric compares mock responses with real API responses.
+
+### Review report
+
+Get detailed HTML reports showing any differences.
+
+</Steps>
+
+## Setting up contract testing
+
+### Create a service definition
+
+First, create a mock API:
+
+```yaml services/users-api.yaml
+name: users-api
+version: "1.0"
+server:
+  port: 9000
+  base_path: /api/v1
+  proxy_base_url: https://api.example.com
+endpoints:
+  - method: GET
+    path: /users
+    description: List all users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          [
+            {"id": 1, "name": "Alice", "email": "alice@example.com"},
+            {"id": 2, "name": "Bob", "email": "bob@example.com"}
+          ]
+  
+  - method: GET
+    path: /users/{id}
+    description: Get user by ID
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": "{{params.id}}",
+            "name": "Alice",
+            "email": "alice@example.com"
+          }
+      404:
+        content_type: application/json
+        body: |
+          {
+            "error": "User not found"
+          }
+```
+
+### Register the contract
+
+Register your service as a testable contract:
+
+```bash
+apicentric contract register \
+  --name users-api \
+  --service services/users-api.yaml
+```
+
+This stores the contract in Apicentric's database for future testing.
+
+### Run a contract test
+
+Compare your mock against the real API:
+
+```bash
+apicentric contract test \
+  --contract users-api \
+  --base-url https://api.example.com
+```
+
+Apicentric will:
+1. Call each endpoint in your mock
+2. Call the same endpoint on the real API
+3. Compare responses (status, headers, body)
+4. Generate a detailed HTML report
+
+### View the report
+
+Open the generated report:
+
+```bash
+open cypress/reports/contract-test-report.html
+```
+
+The report shows:
+- ✅ Matching endpoints
+- ❌ Mismatched responses
+- 📊 Detailed diffs
+- 🔍 Missing endpoints
+
+## Configuration
+
+Create `apicentric.json` to configure contract testing:
+
+```json apicentric.json
+{
+  "base_url": "https://api.example.com",
+  "default_timeout": 30000,
+  "reports_dir": "cypress/reports",
+  "simulator": {
+    "enabled": true,
+    "services_dir": "services",
+    "db_path": "apicentric.db"
+  },
+  "execution": {
+    "mode": "development",
+    "continue_on_failure": true,
+    "verbose": false
+  }
+}
+```
+
+## Advanced contract testing
+
+### Testing specific endpoints
+
+Test only certain endpoints:
+
+```bash
+apicentric contract test \
+  --contract users-api \
+  --endpoints "GET /users,GET /users/{id}"
+```
+
+### Testing with authentication
+
+Add authentication headers:
+
+```yaml services/users-api.yaml
+endpoints:
+  - method: GET
+    path: /profile
+    header_match:
+      Authorization: "Bearer *"
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": 1,
+            "name": "Current User",
+            "email": "user@example.com"
+          }
+```
+
+Provide the token when testing:
+
+```bash
+export AUTH_TOKEN="your-token-here"
+apicentric contract test \
+  --contract users-api \
+  --header "Authorization: Bearer $AUTH_TOKEN"
+```
+
+### Testing multiple scenarios
+
+Use scenarios to test different states:
+
+```yaml services/users-api.yaml
+scenarios:
+  - name: empty_list
+    description: No users exist
+    endpoints: ["GET /users"]
+    response:
+      status: 200
+      body: '[]'
+  
+  - name: server_error
+    description: Server error scenario
+    response:
+      status: 500
+      body: '{"error": "Internal server error"}'
+```
+
+Test a specific scenario:
+
+```bash
+apicentric contract test \
+  --contract users-api \
+  --scenario empty_list
+```
+
+## Continuous integration
+
+### GitHub Actions
+
+Automate contract testing on every PR:
+
+```yaml .github/workflows/contract-tests.yml
+name: Contract Tests
+
+on:
+  pull_request:
+    paths:
+      - 'services/**/*.yaml'
+  schedule:
+    - cron: '0 8 * * *'  # Daily at 8am
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Apicentric
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+      
+      - name: Validate services
+        run: |
+          apicentric simulator validate --path services --recursive
+      
+      - name: Register contract
+        run: |
+          apicentric contract register \
+            --name users-api \
+            --service services/users-api.yaml
+      
+      - name: Run contract tests
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          apicentric contract test \
+            --contract users-api \
+            --base-url "$API_BASE_URL" \
+            --header "Authorization: Bearer $API_TOKEN" \
+            --verbose
+      
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: contract-test-report
+          path: cypress/reports/
+      
+      - name: Comment PR with results
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Contract tests failed! Check the report for details.'
+            })
+```
+
+### GitLab CI
+
+```yaml .gitlab-ci.yml
+stages:
+  - validate
+  - test
+  - report
+
+validate-services:
+  stage: validate
+  script:
+    - curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+    - apicentric simulator validate --path services --recursive
+
+contract-tests:
+  stage: test
+  script:
+    - apicentric contract register --name users-api --service services/users-api.yaml
+    - apicentric contract test --contract users-api --base-url "$API_BASE_URL"
+  artifacts:
+    when: always
+    paths:
+      - cypress/reports/
+    expire_in: 1 week
+```
+
+## Testing strategies
+
+### Development workflow
+
+1. **Create mock first**: Define expected API behavior
+2. **Develop against mock**: Build frontend with working mock
+3. **Backend implements**: Backend team implements real API
+4. **Run contract test**: Validate mock matches implementation
+5. **Fix mismatches**: Update mock or real API to align
+
+### Monitoring production
+
+Schedule regular contract tests to detect API drift:
+
+```bash
+# Daily cron job
+0 8 * * * cd /path/to/project && apicentric contract test --contract users-api
+```
+
+### Pre-deployment validation
+
+Run contract tests before deploying API changes:
+
+```bash
+#!/bin/bash
+# pre-deploy.sh
+
+echo "Running contract tests..."
+apicentric contract test \
+  --contract users-api \
+  --base-url https://staging-api.example.com
+
+if [ $? -eq 0 ]; then
+  echo "✅ Contract tests passed. Safe to deploy."
+  exit 0
+else
+  echo "❌ Contract tests failed. Fix issues before deploying."
+  exit 1
+fi
+```
+
+## Understanding test results
+
+### Successful match
+
+```
+✅ GET /users
+   Status: 200 (expected 200)
+   Content-Type: application/json
+   Body matches schema ✓
+```
+
+### Schema mismatch
+
+```
+❌ GET /users/{id}
+   Status: 200 (expected 200)
+   Body mismatch:
+   - Mock has field 'email'
+   + Real API missing field 'email'
+   + Real API has extra field 'username'
+```
+
+### Status code mismatch
+
+```
+❌ GET /users/999
+   Status: 200 (expected 404)
+   Expected not found error, got success response
+```
+
+### Missing endpoint
+
+```
+⚠️  POST /users
+   Endpoint exists in mock but not found in real API
+   Real API returned 404 Not Found
+```
+
+## Best practices
+
+<Steps>
+
+### Use realistic data
+
+Mock realistic responses that match production data structures.
+
+```yaml
+# Good
+body: |
+  {
+    "id": 1,
+    "created_at": "2024-01-15T10:30:00Z",
+    "email": "user@example.com"
+  }
+
+# Bad
+body: '{"data": "test"}'
+```
+
+### Test error cases
+
+Include error responses in your contracts:
+
+```yaml
+responses:
+  200:
+    body: '{"success": true}'
+  400:
+    body: '{"error": "Bad request"}'
+  401:
+    body: '{"error": "Unauthorized"}'
+  404:
+    body: '{"error": "Not found"}'
+  500:
+    body: '{"error": "Server error"}'
+```
+
+### Version your contracts
+
+Track contract versions alongside API versions:
+
+```yaml
+name: users-api
+version: "2.0.0"
+```
+
+### Document breaking changes
+
+Use descriptions to explain changes:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /users
+    description: |
+      v2.0: Added 'role' field to response
+      v2.0: Removed 'permissions' array (moved to /users/{id}/permissions)
+```
+
+### Run tests regularly
+
+Schedule tests to catch API drift:
+- Daily for critical APIs
+- Weekly for stable APIs
+- On every deployment
+
+</Steps>
+
+## Troubleshooting
+
+### Contract test fails with timeout
+
+Increase timeout in configuration:
+
+```json
+{
+  "default_timeout": 60000
+}
+```
+
+### Real API requires authentication
+
+Add headers to your test command:
+
+```bash
+apicentric contract test \
+  --contract users-api \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "X-API-Key: $API_KEY"
+```
+
+### Response body has dynamic fields
+
+Use wildcards or ignore specific fields:
+
+```yaml
+responses:
+  200:
+    body: |
+      {
+        "id": "{{params.id}}",
+        "timestamp": "*",
+        "data": {}
+      }
+```
+
+<Warning>
+Contract tests call real APIs. Ensure you're testing against staging or development environments to avoid affecting production data.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Digital twin setup" icon="microchip" href="/guides/digital-twin-setup">
+  Create IoT device simulations
+</Card>
+
+<Card title="Request validation" icon="check" href="/guides/request-validation">
+  Add schema validation to contracts
+</Card>
+
+<Card title="Dockerizing services" icon="docker" href="/guides/dockerizing-services">
+  Run contract tests in containers
+</Card>
+
+<Card title="Export specs" icon="upload" href="/guides/exporting-specs">
+  Generate documentation from contracts
+</Card>
+
+</CardGroup>

@@ -1,0 +1,294 @@
+---
+title: mcp
+description: Start the Model Context Protocol server for AI agent integration
+---
+
+<Note>
+The `mcp` command requires the `mcp` feature to be enabled during installation.
+</Note>
+
+The Model Context Protocol (MCP) server allows AI agents to interact with apicentric's mock services programmatically.
+
+## Usage
+
+```bash
+apicentric mcp [flags]
+```
+
+<ParamField path="--test" type="boolean" default="false">
+  Run in test mode (currently not used, server runs normally)
+</ParamField>
+
+## What is MCP?
+
+Model Context Protocol is a standardized way for AI assistants to communicate with tools and services. The apicentric MCP server exposes simulator capabilities to AI agents, enabling:
+
+- Service creation and management
+- Endpoint configuration
+- Request/response mocking
+- Scenario activation
+- Log retrieval
+
+## How it works
+
+1. **JSON-RPC communication**: The server uses stdin/stdout for JSON-RPC messages
+2. **AI agent connection**: AI tools (like Claude Desktop) connect to the server
+3. **Tool invocation**: The agent calls apicentric tools as needed
+4. **Context sharing**: The agent accesses your local apicentric context
+
+## Starting the server
+
+```bash
+apicentric mcp
+```
+
+The server runs in the foreground and processes JSON-RPC requests:
+
+- **Input**: JSON-RPC requests from stdin
+- **Output**: JSON-RPC responses to stdout
+- **Logging**: Diagnostic messages to stderr
+
+<Warning>
+Do not write to stdout manually while the MCP server is running. This will corrupt the JSON-RPC stream.
+</Warning>
+
+## Configuration for AI clients
+
+### Claude Desktop
+
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "apicentric": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "PATH": "/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+### Other MCP clients
+
+Provide the command to your MCP client:
+
+```bash
+command: apicentric mcp
+```
+
+## Available tools
+
+When connected, AI agents can access these capabilities:
+
+### Service management
+
+- Create new service definitions
+- List existing services
+- Start and stop services
+- Get service status
+
+### Endpoint configuration
+
+- Define REST endpoints
+- Configure GraphQL schemas
+- Set up response templates
+- Define scenarios
+
+### Request/response mocking
+
+- Create mock responses
+- Set up dynamic responses
+- Configure status codes and headers
+- Define delays and error conditions
+
+### Scenario management
+
+- Activate scenarios
+- Switch between scenarios
+- Query active scenario
+
+### Logging
+
+- Retrieve request logs
+- Filter logs by criteria
+- Export log data
+
+## Example interaction
+
+AI agents can now help with tasks like:
+
+**User**: "Create a user API with login and registration endpoints"
+
+**AI Agent**: 
+1. Calls `apicentric.create_service` with the service definition
+2. Configures POST `/login` and POST `/register` endpoints
+3. Sets up mock responses for success and error cases
+4. Starts the service
+5. Reports the service URL
+
+## Server lifecycle
+
+### Startup
+
+```bash
+$ apicentric mcp
+# Server starts, waits for requests
+# No output unless there's an error
+```
+
+### Processing requests
+
+The server processes JSON-RPC messages silently:
+
+```json
+{"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+```
+
+### Shutdown
+
+The server exits when:
+
+- stdin is closed (client disconnects)
+- A fatal error occurs
+- `Ctrl+C` is pressed
+
+## Logging
+
+Diagnostic logs are written to stderr, not stdout:
+
+```bash
+apicentric mcp 2> mcp.log
+```
+
+This ensures JSON-RPC messages on stdout remain uncorrupted.
+
+## Error handling
+
+### Server errors
+
+If the server fails to start:
+
+```
+❌ Failed to start MCP server: <error details>
+```
+
+Common causes:
+- Invalid configuration
+- Port already in use
+- Missing dependencies
+
+### Request errors
+
+Invalid JSON-RPC requests return error responses:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32600,
+    "message": "Invalid Request"
+  },
+  "id": null
+}
+```
+
+## Security considerations
+
+<Warning>
+The MCP server has full access to your apicentric context and filesystem. Only connect trusted AI clients.
+</Warning>
+
+### Best practices
+
+- **Review tool calls**: Check what actions the AI agent is performing
+- **Limit scope**: Configure the server with minimal permissions
+- **Monitor logs**: Watch stderr for unexpected operations
+- **Use separate contexts**: Run in a dedicated directory for AI interactions
+
+## Troubleshooting
+
+### Server not responding
+
+Check that:
+1. The server process is running
+2. stdin/stdout are properly connected
+3. No other process is writing to stdout
+
+### AI agent can't connect
+
+Verify:
+1. Command path is correct in client config
+2. `apicentric` binary is in PATH
+3. Client has permission to execute the command
+
+### JSON-RPC errors
+
+Ensure:
+1. Client is sending valid JSON-RPC 2.0 messages
+2. Method names match available tools
+3. Required parameters are provided
+
+## Dry run mode
+
+Dry run affects operations triggered through MCP:
+
+```bash
+apicentric --dry-run mcp
+```
+
+The server runs normally, but tool invocations that modify state will only simulate changes.
+
+## Advanced usage
+
+### With custom config
+
+```bash
+apicentric --config my-config.json mcp
+```
+
+### With verbose logging
+
+```bash
+apicentric --verbose mcp 2> debug.log
+```
+
+### In a specific directory
+
+```bash
+cd /path/to/project
+apicentric mcp
+```
+
+## Integration examples
+
+### Claude Desktop
+
+1. Install and configure Claude Desktop
+2. Add apicentric to MCP servers config
+3. Restart Claude Desktop
+4. Ask Claude to help with API mocking tasks
+
+### Custom MCP client
+
+```javascript
+import { MCPClient } from '@modelcontextprotocol/client';
+
+const client = new MCPClient({
+  command: 'apicentric',
+  args: ['mcp']
+});
+
+await client.connect();
+const tools = await client.listTools();
+console.log('Available tools:', tools);
+```
+
+## Next steps
+
+- Learn about [MCP protocol specification](https://modelcontextprotocol.io/)
+- Set up [Claude Desktop integration](https://claude.ai/desktop)
+- Explore [AI-assisted development workflows](/guides/ai-workflows)

@@ -1,0 +1,351 @@
+---
+title: E-commerce API
+description: Build a complete e-commerce API mock with products, orders, and dynamic scenarios
+---
+
+This example demonstrates a realistic e-commerce API with dynamic data, request validation, fixtures, and multiple scenarios. You'll learn how to simulate product catalogs, order management, and different API states like high traffic or maintenance mode.
+
+## What you'll build
+
+A fully functional e-commerce API with:
+- Product catalog with filtering
+- Order creation with validation
+- Dynamic order status tracking
+- Traffic and maintenance scenarios
+- Handlebars templating for realistic data
+
+<Steps>
+
+### Create the service definition
+
+Create a file named `ecommerce-api.yaml`:
+
+```yaml
+name: E-commerce API
+version: "2.1"
+description: Sample e-commerce API with products and orders
+server:
+  port: 9002
+  base_path: /api/v2
+  
+fixtures:
+  products:
+    - id: 101
+      name: "Laptop Pro"
+      price: 1299.99
+      category: "electronics"
+      stock: 15
+    - id: 102  
+      name: "Coffee Mug"
+      price: 12.50
+      category: "home"
+      stock: 50
+
+endpoints:
+  - method: GET
+    path: /products
+    description: List products with optional filtering
+    parameters:
+      - name: category
+        in: query
+        required: false
+        type: string
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "products": [
+              {{#each fixtures.products}}
+              {
+                "id": {{id}},
+                "name": "{{name}}",
+                "price": {{price}},
+                "category": "{{category}}",
+                "stock": {{stock}}
+              }{{#unless @last}},{{/unless}}
+              {{/each}}
+            ],
+            "total": {{fixtures.products.length}},
+            "filter": "{{query.category}}"
+          }
+
+  - method: POST
+    path: /orders
+    description: Create a new order
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "customer_id": "number",
+          "items": [{"product_id": "number", "quantity": "number"}]
+        }
+    responses:
+      201:
+        content_type: application/json  
+        body: |
+          {
+            "order_id": {{faker "datatype.number" min=1000 max=9999}},
+            "customer_id": {{request.body.customer_id}},
+            "items": {{json request.body.items}},
+            "total": {{faker "commerce.price"}},
+            "status": "pending",
+            "created_at": "{{now}}"
+          }
+      422:
+        condition: "{{not request.body.customer_id}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Invalid order",
+            "details": ["Customer ID is required"]
+          }
+
+  - method: GET
+    path: /orders/{id}/status
+    description: Get order status
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "order_id": {{params.id}},
+            "status": "{{#random}}pending,processing,shipped,delivered{{/random}}",
+            "updated_at": "{{now}}"
+          }
+
+scenarios:
+  - name: "holiday_traffic"
+    description: "Simulate high traffic during holidays"
+    delay_ms: 1500
+    response_rate: 0.8
+    
+  - name: "maintenance_mode"  
+    description: "Service under maintenance"
+    response:
+      status: 503
+      headers:
+        Retry-After: "3600"
+      body: |
+        {
+          "error": "Service under maintenance",
+          "retry_after": "1 hour"
+        }
+```
+
+### Start the simulator
+
+Launch your mock API server:
+
+```bash
+apicentric simulator start --services-dir .
+```
+
+The API will be available at `http://localhost:9002/api/v2`.
+
+### Test the endpoints
+
+Now you can interact with your e-commerce API.
+
+<CodeGroup>
+
+```bash Get all products
+curl http://localhost:9002/api/v2/products
+```
+
+```bash Filter by category
+curl "http://localhost:9002/api/v2/products?category=electronics"
+```
+
+```bash Create an order
+curl -X POST http://localhost:9002/api/v2/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": 12345,
+    "items": [
+      {"product_id": 101, "quantity": 1},
+      {"product_id": 102, "quantity": 2}
+    ]
+  }'
+```
+
+```bash Get order status
+curl http://localhost:9002/api/v2/orders/5678/status
+```
+
+```bash Test validation (missing customer_id)
+curl -X POST http://localhost:9002/api/v2/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [{"product_id": 101, "quantity": 1}]
+  }'
+```
+
+</CodeGroup>
+
+### View the results
+
+Successful product listing response:
+
+```json
+{
+  "products": [
+    {
+      "id": 101,
+      "name": "Laptop Pro",
+      "price": 1299.99,
+      "category": "electronics",
+      "stock": 15
+    },
+    {
+      "id": 102,
+      "name": "Coffee Mug",
+      "price": 12.50,
+      "category": "home",
+      "stock": 50
+    }
+  ],
+  "total": 2,
+  "filter": ""
+}
+```
+
+Successful order creation:
+
+```json
+{
+  "order_id": 7834,
+  "customer_id": 12345,
+  "items": [
+    {"product_id": 101, "quantity": 1},
+    {"product_id": 102, "quantity": 2}
+  ],
+  "total": "89.99",
+  "status": "pending",
+  "created_at": "2024-01-15T14:30:45Z"
+}
+```
+
+Validation error response:
+
+```json
+{
+  "error": "Invalid order",
+  "details": ["Customer ID is required"]
+}
+```
+
+### Test different scenarios
+
+Simulate high traffic during holidays:
+
+```bash
+curl http://localhost:9002/api/v2/products \
+  -H "X-Scenario: holiday_traffic"
+```
+
+<Note>
+This adds a 1500ms delay and succeeds 80% of the time to simulate realistic holiday traffic.
+</Note>
+
+Simulate maintenance mode:
+
+```bash
+curl http://localhost:9002/api/v2/products \
+  -H "X-Scenario: maintenance_mode"
+```
+
+You'll receive a 503 response:
+
+```json
+{
+  "error": "Service under maintenance",
+  "retry_after": "1 hour"
+}
+```
+
+</Steps>
+
+## Key features demonstrated
+
+### Fixtures
+
+Reusable data defined once and referenced throughout your endpoints:
+
+```yaml
+fixtures:
+  products:
+    - id: 101
+      name: "Laptop Pro"
+      price: 1299.99
+```
+
+Access in templates with `{{fixtures.products}}`.
+
+### Handlebars templating
+
+Dynamic responses using Handlebars helpers:
+
+- `{{#each}}` - Loop through collections
+- `{{faker}}` - Generate realistic fake data
+- `{{now}}` - Current timestamp
+- `{{json}}` - Echo request body data
+- `{{#random}}` - Pick random values
+
+### Request validation
+
+Conditional responses based on request content:
+
+```yaml
+responses:
+  422:
+    condition: "{{not request.body.customer_id}}"
+    body: |
+      {
+        "error": "Invalid order",
+        "details": ["Customer ID is required"]
+      }
+```
+
+### Path parameters
+
+Capture dynamic URL segments:
+
+```yaml
+path: /orders/{id}/status
+# Access with: {{params.id}}
+```
+
+### Scenarios
+
+Simulate different API states without changing code:
+
+- **delay_ms** - Add latency
+- **response_rate** - Simulate failures (0.8 = 80% success)
+- **response** - Override with custom status and body
+- **endpoints** - Apply to specific endpoints
+
+<Tip>
+Use scenarios to test how your frontend handles slow responses, errors, and downtime.
+</Tip>
+
+## Dockerize for deployment
+
+Create a portable Docker image:
+
+```bash
+apicentric simulator dockerize --file ecommerce-api.yaml --output ./ecommerce-docker
+cd ecommerce-docker
+docker build -t ecommerce-api .
+docker run -p 9002:9002 ecommerce-api
+```
+
+Now you can share your mock API with your team or deploy it to any environment.
+
+## Next steps
+
+- Add authentication with custom headers and conditions
+- Generate TypeScript types with `apicentric simulator generate-types`
+- Create React Query hooks with `apicentric simulator generate-query`
+- Export to OpenAPI spec with `apicentric simulator export --format openapi`
+- Set up contract testing to validate against real APIs

@@ -1,0 +1,282 @@
+---
+title: simulator logs
+description: View and filter request logs from running simulator services
+---
+
+Retrieve and filter HTTP request logs from a specific service running in the simulator. View request history with optional filtering by method, route, and status code.
+
+## Usage
+
+```bash
+apicentric simulator logs --service <NAME> [OPTIONS]
+```
+
+## Arguments
+
+<ParamField path="--service" type="string" required>
+  Name of the service to retrieve logs from. Must match a service name from your running simulator instance.
+</ParamField>
+
+## Options
+
+<ParamField path="--limit" type="number" default="100">
+  Maximum number of log entries to retrieve. Use lower values for quick checks or higher values for comprehensive analysis.
+</ParamField>
+
+<ParamField path="--method" type="string">
+  Filter logs by HTTP method (e.g., GET, POST, PUT, DELETE). Only logs matching this method will be returned.
+</ParamField>
+
+<ParamField path="--route" type="string">
+  Filter logs by request path or route pattern. Only requests matching this path will be included.
+</ParamField>
+
+<ParamField path="--status" type="number">
+  Filter logs by HTTP response status code (e.g., 200, 404, 500). Only responses with this status code will be shown.
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Save logs to a JSON file instead of printing to console. Useful for further processing or archival.
+</ParamField>
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be executed without actually fetching logs (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### View recent logs for a service
+
+```bash
+apicentric simulator logs --service users
+```
+
+**Example output:**
+
+```
+[2024-03-15T10:23:45Z] GET /api/v1/users/123 -> 200
+[2024-03-15T10:24:12Z] POST /api/v1/users -> 201
+[2024-03-15T10:25:03Z] GET /api/v1/users -> 200
+[2024-03-15T10:26:18Z] DELETE /api/v1/users/456 -> 204
+```
+
+### Limit number of entries
+
+```bash
+apicentric simulator logs --service users --limit 10
+```
+
+Retrieve only the 10 most recent log entries.
+
+### Filter by HTTP method
+
+```bash
+apicentric simulator logs --service users --method POST
+```
+
+**Example output:**
+
+```
+[2024-03-15T10:24:12Z] POST /api/v1/users -> 201
+[2024-03-15T10:27:05Z] POST /api/v1/users -> 201
+[2024-03-15T10:28:33Z] POST /api/v1/users -> 400
+```
+
+Shows only POST requests.
+
+### Filter by route pattern
+
+```bash
+apicentric simulator logs --service users --route /api/v1/users/123
+```
+
+Shows only requests to the specific route.
+
+### Filter by status code
+
+```bash
+apicentric simulator logs --service users --status 404
+```
+
+**Example output:**
+
+```
+[2024-03-15T10:30:22Z] GET /api/v1/users/999 -> 404
+[2024-03-15T10:31:15Z] GET /api/v1/users/888 -> 404
+```
+
+Useful for debugging errors or monitoring failed requests.
+
+### Combine multiple filters
+
+```bash
+apicentric simulator logs --service users --method GET --status 200 --limit 50
+```
+
+Shows the 50 most recent successful GET requests.
+
+### Save logs to file
+
+```bash
+apicentric simulator logs --service users --output logs.json
+```
+
+**Example output:**
+
+```
+Saved 147 log entries to logs.json
+```
+
+The JSON file contains detailed log data:
+
+```json
+[
+  {
+    "timestamp": "2024-03-15T10:23:45Z",
+    "method": "GET",
+    "path": "/api/v1/users/123",
+    "status": 200,
+    "duration_ms": 12,
+    "request_headers": {...},
+    "response_headers": {...}
+  }
+]
+```
+
+### No logs available
+
+```bash
+apicentric simulator logs --service products
+```
+
+**Example output:**
+
+```
+No logs available for service 'products'.
+```
+
+### Dry run mode
+
+```bash
+apicentric simulator logs --service users --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would fetch logs for service 'users' (limit=100, method=None, route=None, status=None, output=None)
+```
+
+## Log entry format
+
+Each log entry includes:
+
+- **Timestamp** - When the request was received (ISO 8601 format)
+- **Method** - HTTP method (GET, POST, etc.)
+- **Path** - Request path/route
+- **Status** - HTTP response status code
+
+When saved to JSON, additional fields include:
+- Request and response headers
+- Request duration in milliseconds
+- Request body (if applicable)
+- Response body (if applicable)
+
+## Use cases
+
+### Debug failed requests
+
+```bash
+apicentric simulator logs --service api --status 500 --limit 20
+```
+
+Find recent server errors to diagnose issues.
+
+### Monitor specific endpoints
+
+```bash
+apicentric simulator logs --service api --route /api/v1/checkout
+```
+
+Track all requests to critical endpoints.
+
+### Analyze API usage patterns
+
+```bash
+apicentric simulator logs --service api --output usage.json
+cat usage.json | jq '[.[] | .path] | group_by(.) | map({path: .[0], count: length})'
+```
+
+Export logs and analyze with tools like `jq`.
+
+### CI/CD validation
+
+```bash
+# Run tests against simulator
+npm test
+
+# Verify expected requests were made
+apicentric simulator logs --service api --method POST --route /api/users > logs.txt
+grep -q "201" logs.txt || exit 1
+```
+
+## Related commands
+
+- [`simulator status`](/cli/simulator/status) - Check which services are running
+- [`simulator start`](/cli/simulator/start) - Start the simulator
+
+<Info>
+Logs are stored in memory while the simulator is running. When you stop the simulator, logs are cleared. Use `--output` to save logs before stopping if you need to preserve them.
+</Info>
+
+## Troubleshooting
+
+### Service not found
+
+```
+❌ Service 'myservice' not found
+💡 Check simulator status for available services
+```
+
+**Solution:** Run `apicentric simulator status --detailed` to see available service names.
+
+### Simulator not running
+
+```
+❌ API simulator is not enabled or configured
+💡 Enable simulator in apicentric.json
+```
+
+**Solution:** Start the simulator first:
+
+```bash
+apicentric simulator start --services-dir ./services
+```
+
+### Failed to fetch logs
+
+```
+❌ Failed to fetch logs: connection refused
+```
+
+**Solution:** Verify the service is running and the port is accessible:
+
+```bash
+apicentric simulator status --detailed
+```

@@ -1,0 +1,574 @@
+---
+title: Docker deployment
+description: Package and deploy Apicentric services using Docker for portable, production-ready API mocks
+---
+
+Apicentric provides powerful Docker support, allowing you to package your mock services into self-contained images for easy deployment, sharing, and production use.
+
+## Quick dockerization
+
+Transform any service definition into a Docker image with a single command:
+
+```bash
+apicentric simulator dockerize --file services/user-api.yaml --output ./docker-build
+```
+
+This generates:
+- `Dockerfile` - Multi-stage build optimized for production
+- `.dockerignore` - Excludes unnecessary files
+- `services/` - Your service definitions
+
+<Steps>
+  <Step title="Generate Docker files">
+    Create the Docker build context:
+    
+    ```bash
+    apicentric simulator dockerize \
+      --file services/user-api.yaml \
+      --file services/products-api.yaml \
+      --output ./my-service-docker
+    ```
+  </Step>
+  
+  <Step title="Build the image">
+    Navigate to the output directory and build:
+    
+    ```bash
+    cd my-service-docker
+    docker build -t my-api-mocks:latest .
+    ```
+  </Step>
+  
+  <Step title="Run the container">
+    Start your mock services:
+    
+    ```bash
+    docker run -p 9000:9000 my-api-mocks:latest
+    ```
+    
+    Your services are now accessible at `http://localhost:9000`
+  </Step>
+</Steps>
+
+## Dockerfile structure
+
+Apicentric generates optimized multi-stage Dockerfiles:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+# Build stage
+FROM --platform=$BUILDPLATFORM rust:1-bookworm as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release --bin apicentric --features "simulator,contract-testing"
+
+# Runtime stage
+FROM gcr.io/distroless/cc-debian12
+COPY --from=builder /app/target/release/apicentric /usr/local/bin/apicentric
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/apicentric"]
+CMD ["simulator", "start", "--services-dir", "/app/services"]
+```
+
+<Note>
+The generated Dockerfile uses distroless images for minimal attack surface and smaller image sizes (~50MB vs 1GB+ with full OS).
+</Note>
+
+## Multi-service deployment
+
+### Package multiple services
+
+Include multiple API mocks in a single image:
+
+```bash
+apicentric simulator dockerize \
+  --file services/user-api.yaml \
+  --file services/products-api.yaml \
+  --file services/orders-api.yaml \
+  --output ./ecommerce-mocks
+```
+
+All services will be bundled and started together.
+
+### Port mapping
+
+Map different service ports:
+
+```bash
+# user-api.yaml uses port 9000
+# products-api.yaml uses port 9001
+# orders-api.yaml uses port 9002
+
+docker run \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -p 9002:9002 \
+  ecommerce-mocks:latest
+```
+
+<Tip>
+Define unique ports in each service YAML file to avoid conflicts when running multiple services.
+</Tip>
+
+## Production deployment
+
+### Full-featured Dockerfile
+
+For production deployments with frontend and backend:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+# Stage 1: Build Frontend
+FROM node:22-alpine AS frontend-builder
+WORKDIR /app/webui
+
+COPY webui/package*.json ./
+RUN npm ci
+
+COPY webui/ ./
+RUN npm run build
+
+# Stage 2: Build Backend
+FROM rust:1.92-bookworm AS backend-builder
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Cargo.toml Cargo.lock ./
+COPY src/ ./src/
+
+RUN cargo build --release --bin apicentric
+
+# Stage 3: Runtime
+FROM debian:bookworm-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=backend-builder /app/target/release/apicentric /usr/local/bin/apicentric
+COPY --from=frontend-builder /app/webui/.next/standalone ./webui
+COPY --from=frontend-builder /app/webui/.next/static ./webui/.next/static
+COPY --from=frontend-builder /app/webui/public ./webui/public
+
+RUN mkdir -p /app/data /app/services
+
+ENV APICENTRIC_PORT=8080
+ENV APICENTRIC_HOST=0.0.0.0
+ENV APICENTRIC_DATA_DIR=/app/data
+ENV APICENTRIC_SERVICES_DIR=/app/services
+ENV RUST_LOG=info,apicentric=debug
+
+EXPOSE 8080 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["apicentric", "cloud"]
+```
+
+### Health checks
+
+Add robust health monitoring:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+```
+
+Test the health endpoint:
+
+```bash
+docker inspect --format='{{.State.Health.Status}}' container-name
+```
+
+## Docker Compose
+
+Orchestrate multiple mock services with Docker Compose:
+
+### Basic setup
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  user-api:
+    build:
+      context: ./user-api-docker
+    ports:
+      - "9000:9000"
+    environment:
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  products-api:
+    build:
+      context: ./products-api-docker
+    ports:
+      - "9001:9001"
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      user-api:
+        condition: service_healthy
+
+  orders-api:
+    build:
+      context: ./orders-api-docker
+    ports:
+      - "9002:9002"
+    environment:
+      - RUST_LOG=info
+    depends_on:
+      - user-api
+      - products-api
+```
+
+Start all services:
+
+```bash
+docker-compose up -d
+```
+
+### With volumes
+
+Mount service definitions for live updates:
+
+```yaml
+services:
+  apicentric:
+    image: apicentric/apicentric:latest
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./services:/app/services:ro
+      - apicentric-data:/app/data
+    environment:
+      - APICENTRIC_SERVICES_DIR=/app/services
+      - RUST_LOG=debug
+
+volumes:
+  apicentric-data:
+```
+
+<Warning>
+Use read-only (`:ro`) mounts for service definitions in production to prevent accidental modifications.
+</Warning>
+
+## Container registry
+
+### Push to Docker Hub
+
+<Steps>
+  <Step title="Build and tag">
+    ```bash
+    docker build -t username/api-mocks:v1.0.0 .
+    docker tag username/api-mocks:v1.0.0 username/api-mocks:latest
+    ```
+  </Step>
+  
+  <Step title="Login to Docker Hub">
+    ```bash
+    docker login
+    ```
+  </Step>
+  
+  <Step title="Push images">
+    ```bash
+    docker push username/api-mocks:v1.0.0
+    docker push username/api-mocks:latest
+    ```
+  </Step>
+</Steps>
+
+### GitHub Container Registry
+
+```bash
+# Login to GitHub Container Registry
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+
+# Tag for GHCR
+docker tag api-mocks:latest ghcr.io/username/api-mocks:latest
+
+# Push
+docker push ghcr.io/username/api-mocks:latest
+```
+
+### Private registry
+
+```bash
+# Tag for private registry
+docker tag api-mocks:latest registry.company.com/api-mocks:latest
+
+# Login and push
+docker login registry.company.com
+docker push registry.company.com/api-mocks:latest
+```
+
+## Kubernetes deployment
+
+Deploy Apicentric to Kubernetes clusters:
+
+### Basic deployment
+
+```yaml deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apicentric-mocks
+  labels:
+    app: apicentric
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: apicentric
+  template:
+    metadata:
+      labels:
+        app: apicentric
+    spec:
+      containers:
+      - name: apicentric
+        image: ghcr.io/username/api-mocks:latest
+        ports:
+        - containerPort: 9000
+          name: http
+        env:
+        - name: RUST_LOG
+          value: "info"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+```
+
+### Service definition
+
+```yaml service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: apicentric-service
+spec:
+  selector:
+    app: apicentric
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 9000
+  type: LoadBalancer
+```
+
+Deploy to cluster:
+
+```bash
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+```
+
+### ConfigMap for services
+
+Store service definitions in ConfigMaps:
+
+```yaml configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apicentric-services
+data:
+  user-api.yaml: |
+    name: User API
+    version: "1.0"
+    server:
+      port: 9000
+    endpoints:
+      - method: GET
+        path: /users
+        responses:
+          200:
+            content_type: application/json
+            body: '{"users": []}'
+```
+
+Mount in deployment:
+
+```yaml
+volumes:
+- name: services
+  configMap:
+    name: apicentric-services
+
+volumeMounts:
+- name: services
+  mountPath: /app/services
+  readOnly: true
+```
+
+## Environment variables
+
+Configure Apicentric containers with environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------||
+| `APICENTRIC_PORT` | Server port | `8080` |
+| `APICENTRIC_HOST` | Bind address | `0.0.0.0` |
+| `APICENTRIC_SERVICES_DIR` | Services directory | `/app/services` |
+| `APICENTRIC_DATA_DIR` | Data directory | `/app/data` |
+| `RUST_LOG` | Log level | `info` |
+
+<CodeGroup>
+```bash Docker
+docker run \
+  -e APICENTRIC_PORT=9000 \
+  -e RUST_LOG=debug \
+  -p 9000:9000 \
+  my-api-mocks:latest
+```
+
+```yaml Docker Compose
+environment:
+  - APICENTRIC_PORT=9000
+  - APICENTRIC_HOST=0.0.0.0
+  - RUST_LOG=debug
+```
+
+```yaml Kubernetes
+env:
+- name: APICENTRIC_PORT
+  value: "9000"
+- name: RUST_LOG
+  value: "debug"
+```
+</CodeGroup>
+
+## Best practices
+
+### Minimize image size
+
+1. **Use multi-stage builds** to exclude build dependencies
+2. **Use distroless or Alpine** base images
+3. **Clean up package caches** in the same RUN command
+4. **Copy only necessary files** with `.dockerignore`
+
+```dockerfile .dockerignore
+target/
+.git/
+*.md
+tests/
+examples/
+```
+
+### Security hardening
+
+1. **Run as non-root user:**
+
+```dockerfile
+RUN useradd -r -u 1001 apicentric
+USER apicentric
+```
+
+2. **Use specific image tags:**
+
+```dockerfile
+FROM rust:1.92-bookworm  # Not 'latest'
+```
+
+3. **Scan for vulnerabilities:**
+
+```bash
+docker scan my-api-mocks:latest
+```
+
+### Performance optimization
+
+1. **Layer caching** - Order Dockerfile commands from least to most frequently changed
+2. **BuildKit** - Use Docker BuildKit for parallel builds:
+
+```bash
+DOCKER_BUILDKIT=1 docker build -t my-api-mocks .
+```
+
+3. **Resource limits** - Set appropriate CPU and memory limits:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '0.5'
+      memory: 512M
+    reservations:
+      cpus: '0.25'
+      memory: 256M
+```
+
+## Troubleshooting
+
+### Container exits immediately
+
+Check logs:
+
+```bash
+docker logs container-name
+```
+
+Common issues:
+- Port already in use
+- Missing service files
+- Invalid YAML syntax
+
+### Service not accessible
+
+Verify port mapping:
+
+```bash
+docker ps
+netstat -an | grep 9000
+```
+
+Check if the service is listening:
+
+```bash
+docker exec -it container-name curl http://localhost:9000/health
+```
+
+### High memory usage
+
+Monitor resource usage:
+
+```bash
+docker stats container-name
+```
+
+Adjust memory limits in Docker Compose or Kubernetes manifests.
+
+<Tip>
+Use Apicentric's built-in health check endpoint (`/health`) for container orchestration to ensure services are ready before accepting traffic.
+</Tip>

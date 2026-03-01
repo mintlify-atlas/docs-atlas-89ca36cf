@@ -1,0 +1,226 @@
+---
+title: Core concepts overview
+description: Learn the fundamental concepts and architecture of Apicentric
+---
+
+Apicentric is built around a few core concepts that make it powerful yet simple to use. Understanding these concepts will help you create realistic API mocks and simulate complex scenarios.
+
+## What is Apicentric?
+
+Apicentric is a Rust-based API simulator platform that helps you:
+
+- Mock REST and GraphQL APIs with simple YAML configuration
+- Create realistic test data with fixtures and dynamic templating
+- Simulate different API states and failure scenarios
+- Test your applications without depending on real backend services
+
+## Architecture overview
+
+Apicentric follows **Hexagonal Architecture** (Ports and Adapters) to separate core business logic from external concerns:
+
+<Steps>
+  <Step title="Domain (Core)">
+    Contains the business rules, entities, and logic with no external dependencies. This includes service definitions, endpoint configurations, and validation rules.
+  </Step>
+  
+  <Step title="Ports (Boundaries)">
+    Define interfaces (traits) that specify how the domain interacts with the outside world, such as configuration loading and HTTP handling.
+  </Step>
+  
+  <Step title="Adapters (Infrastructure)">
+    Implement the ports with concrete implementations like file loaders, HTTP servers, and template engines.
+  </Step>
+  
+  <Step title="Simulator">
+    The core API simulation engine that orchestrates everything together, handling requests and generating responses.
+  </Step>
+</Steps>
+
+<Info>
+The architecture ensures that your service definitions remain independent of the underlying infrastructure, making them portable and easy to test.
+</Info>
+
+## Core concepts
+
+Apicentric is built around four main concepts:
+
+### Service definitions
+
+A **service definition** is a YAML file that describes your mock API. It contains:
+
+- Metadata (name, version, description)
+- Server configuration (port, base path, CORS)
+- Endpoints with request/response definitions
+- Fixtures for reusable test data
+- Scenarios for different API states
+- Behavior settings for latency and error simulation
+
+Example structure:
+
+```yaml
+name: Tasks API
+version: "1.0"
+description: Simple task management API
+server:
+  port: 9001
+  base_path: /api/v1
+  cors:
+    enabled: true
+```
+
+[Learn more about service definitions →](/concepts/service-definitions)
+
+### Fixtures and templating
+
+**Fixtures** are reusable data objects that you can reference in your endpoint responses. Combined with **Handlebars templating**, they enable dynamic, realistic responses.
+
+You can use fixtures to:
+
+- Store collections of test data (users, products, orders)
+- Create relationships between data entities
+- Generate consistent responses across endpoints
+- Iterate over data with template helpers
+
+Example:
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      email: "alice@example.com"
+
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        body: |
+          {{#each fixtures.users}}
+          {"id": {{id}}, "username": "{{username}}"}
+          {{/each}}
+```
+
+[Learn more about fixtures and templating →](/concepts/fixtures-and-templating)
+
+### Scenarios
+
+**Scenarios** allow you to simulate different API states and conditions without changing your service definition. They're perfect for testing:
+
+- Error handling and retry logic
+- Performance under load
+- Maintenance mode behavior
+- Rate limiting and throttling
+- Different response variations
+
+You can activate scenarios via:
+
+- Command line flags when starting the simulator
+- HTTP headers in your requests
+- The admin API
+- The TUI interface
+
+[Learn more about scenarios →](/concepts/scenarios)
+
+### Endpoints
+
+Endpoints define the API routes your mock service will respond to. Each endpoint specifies:
+
+- HTTP method (GET, POST, PUT, DELETE, etc.)
+- Path with optional parameters (e.g., `/users/{id}`)
+- Request parameters and body requirements
+- Multiple response definitions with status codes
+- Conditional logic for different responses
+- Side effects that modify service state
+
+Endpoints support:
+
+- **Path parameters**: `/users/{id}`, `/orders/{orderId}/items/{itemId}`
+- **Query parameters**: `?category=electronics&sort=price`
+- **Request validation**: Check required fields and headers
+- **Conditional responses**: Return different data based on request content
+
+## How it works
+
+When you start the Apicentric simulator:
+
+<Steps>
+  <Step title="Load service definitions">
+    The simulator reads your YAML files and validates the configuration.
+  </Step>
+  
+  <Step title="Initialize the template engine">
+    Handlebars is set up with built-in helpers and your fixtures.
+  </Step>
+  
+  <Step title="Start HTTP servers">
+    Each service gets its own HTTP server on the specified port.
+  </Step>
+  
+  <Step title="Handle requests">
+    When a request comes in, the simulator:
+    - Matches the path and method to an endpoint
+    - Extracts parameters and request data
+    - Evaluates scenario conditions
+    - Renders the response template with the template engine
+    - Returns the response with appropriate status and headers
+  </Step>
+</Steps>
+
+## Key features
+
+### Dynamic responses
+
+Use Handlebars templating to create responses that:
+
+- Access request data (parameters, headers, body)
+- Use fixtures and runtime state
+- Generate random data with Faker
+- Apply conditional logic
+- Transform and manipulate data
+
+### State management
+
+Apicentric maintains state across requests:
+
+- **Fixtures**: Predefined data loaded from your YAML
+- **Runtime data**: Mutable state that can be modified by side effects
+- **Bucket**: Persistent storage for dynamic data
+
+### Request validation
+
+Validate incoming requests with:
+
+- Required/optional parameters
+- Content type checking
+- Header matching
+- Custom conditions in responses
+
+### Multiple protocols
+
+Beyond REST APIs, Apicentric supports:
+
+- **GraphQL**: Schema-based mocking with operation resolvers
+- **WebSocket**: Real-time bidirectional communication
+- **Server-Sent Events (SSE)**: Streaming data to clients
+- **MQTT & Modbus** (with IoT features): Industrial protocols for digital twins
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Service definitions" icon="file-code" href="/concepts/service-definitions">
+    Learn the YAML structure and configuration options
+  </Card>
+  
+  <Card title="Fixtures and templating" icon="brackets-curly" href="/concepts/fixtures-and-templating">
+    Master dynamic responses with Handlebars
+  </Card>
+  
+  <Card title="Scenarios" icon="flask" href="/concepts/scenarios">
+    Simulate different API states and conditions
+  </Card>
+  
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get started with your first mock API
+  </Card>
+</CardGroup>

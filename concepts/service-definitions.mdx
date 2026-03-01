@@ -1,0 +1,521 @@
+---
+title: Service definitions
+description: Learn how to define mock APIs using YAML configuration files
+---
+
+Service definitions are YAML files that describe your mock API's structure, behavior, and data. They're the foundation of Apicentric and allow you to create realistic API mocks without writing code.
+
+## Basic structure
+
+Every service definition contains these top-level fields:
+
+```yaml
+name: Tasks API
+version: "1.0"
+description: Simple task management API for demonstration
+server:
+  port: 9001
+  base_path: /api/v1
+  cors:
+    enabled: true
+    origins: ["*"]
+
+fixtures:
+  # Your test data here
+
+endpoints:
+  # Your API endpoints here
+
+scenarios:
+  # Optional scenarios for different states
+
+behavior:
+  # Optional behavior configuration
+```
+
+## Configuration reference
+
+### Metadata
+
+Define basic information about your service:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Service name displayed in logs and UI |
+| `version` | string | No | Semantic version (e.g., "1.0", "2.1.0") |
+| `description` | string | No | Human-readable description of the service |
+
+```yaml
+name: User Management API
+version: "2.1"
+description: REST API for managing user accounts and profiles
+```
+
+### Server configuration
+
+The `server` section controls how your mock API runs:
+
+```yaml
+server:
+  port: 9001
+  base_path: /api/v1
+  cors:
+    enabled: true
+    origins: ["http://localhost:3000", "https://app.example.com"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    headers: ["Content-Type", "Authorization"]
+    credentials: true
+```
+
+<Accordion title="Server configuration options">
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `port` | integer | Required | Port number for the HTTP server |
+| `base_path` | string | `/` | Base path prepended to all endpoints |
+| `cors.enabled` | boolean | `false` | Enable Cross-Origin Resource Sharing |
+| `cors.origins` | array | `["*"]` | Allowed origins for CORS requests |
+| `cors.methods` | array | All methods | Allowed HTTP methods |
+| `cors.headers` | array | All headers | Allowed request headers |
+| `cors.credentials` | boolean | `false` | Allow credentials in CORS requests |
+
+</Accordion>
+
+<Note>
+If you don't specify a port, Apicentric will automatically assign one from the configured port range (default: 8000-8999).
+</Note>
+
+### Endpoints
+
+Endpoints define the API routes your service responds to. Each endpoint specifies the HTTP method, path, parameters, and responses.
+
+```yaml
+endpoints:
+  - method: GET
+    path: /tasks
+    description: Get all tasks with optional filtering
+    parameters:
+      - name: completed
+        in: query
+        required: false
+        type: boolean
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "tasks": [
+              {{#each fixtures.tasks}}
+              {
+                "id": {{id}},
+                "title": "{{title}}",
+                "completed": {{completed}}
+              }{{#unless @last}},{{/unless}}
+              {{/each}}
+            ]
+          }
+```
+
+#### Endpoint fields
+
+<Accordion title="Complete endpoint configuration reference">
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `method` | string | Yes | HTTP method: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS |
+| `path` | string | Yes | URL path, must start with `/`. Supports parameters: `/users/{id}` |
+| `description` | string | No | Human-readable description of what this endpoint does |
+| `parameters` | array | No | Query, path, or header parameters |
+| `request_body` | object | No | Request body requirements and schema |
+| `responses` | object | Yes | Map of status codes to response definitions |
+| `kind` | string | No | Endpoint type: `http`, `websocket`, or `sse` (default: `http`) |
+| `header_match` | object | No | Headers that must match for this endpoint to trigger |
+| `stream` | object | No | Streaming configuration for WebSocket/SSE endpoints |
+
+</Accordion>
+
+#### Path parameters
+
+Use curly braces to define dynamic path segments:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /users/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": {{params.id}},
+            "username": "user_{{params.id}}"
+          }
+```
+
+You can access path parameters in templates using `{{params.parameterName}}`.
+
+#### Query parameters
+
+Define expected query parameters:
+
+```yaml
+parameters:
+  - name: category
+    in: query
+    required: false
+    type: string
+    description: Filter products by category
+  - name: page
+    in: query
+    required: false
+    type: integer
+  - name: limit
+    in: query
+    required: false
+    type: integer
+```
+
+Access query parameters in templates: `{{request.query.category}}`
+
+#### Request body
+
+Specify request body requirements:
+
+```yaml
+request_body:
+  required: true
+  content_type: application/json
+  schema: CreateUserRequest  # Reference to a model definition
+```
+
+Access request body in templates: `{{request.body.fieldName}}`
+
+### Responses
+
+Each endpoint must define at least one response. Responses are keyed by HTTP status code:
+
+```yaml
+responses:
+  200:
+    content_type: application/json
+    body: |
+      {
+        "success": true,
+        "data": "{{request.body.title}}"
+      }
+  400:
+    condition: "{{not request.body.title}}"
+    content_type: application/json
+    body: |
+      {
+        "error": "Validation failed",
+        "message": "Title is required"
+      }
+  404:
+    content_type: application/json
+    body: |
+      {
+        "error": "Not found"
+      }
+```
+
+#### Response fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content_type` | string | Yes | MIME type (e.g., `application/json`, `text/html`) |
+| `body` | string | Yes | Response body template (supports Handlebars) |
+| `condition` | string | No | Template expression that must evaluate to true |
+| `headers` | object | No | Additional response headers |
+| `schema` | string | No | Reference to a model for validation |
+| `side_effects` | array | No | Actions to perform when this response is returned |
+
+#### Conditional responses
+
+Use the `condition` field to return different responses based on request data:
+
+```yaml
+responses:
+  200:
+    condition: "{{eq params.id '1'}}"
+    content_type: application/json
+    body: |
+      {"id": 1, "name": "Alice"}
+  200:
+    condition: "{{eq params.id '2'}}"
+    content_type: application/json
+    body: |
+      {"id": 2, "name": "Bob"}
+  404:
+    condition: "{{not (or (eq params.id '1') (eq params.id '2'))}}"
+    content_type: application/json
+    body: |
+      {"error": "User not found"}
+```
+
+<Warning>
+The simulator evaluates conditions in the order they appear. The first matching response is returned.
+</Warning>
+
+#### Custom headers
+
+Add custom headers to responses:
+
+```yaml
+responses:
+  200:
+    content_type: application/json
+    headers:
+      X-RateLimit-Remaining: "100"
+      X-Custom-Header: "{{request.headers.x-request-id}}"
+    body: |
+      {"status": "ok"}
+```
+
+#### Side effects
+
+Modify service state when a response is returned:
+
+```yaml
+responses:
+  201:
+    content_type: application/json
+    body: |
+      {"id": {{faker "datatype.number"}}, "created": true}
+    side_effects:
+      - action: "set"
+        target: "bucket.lastCreated"
+        value: "{{request.body.title}}"
+```
+
+### Models
+
+Define reusable data schemas using JSON Schema:
+
+```yaml
+models:
+  User:
+    type: object
+    required: ["username", "email"]
+    properties:
+      id:
+        type: integer
+      username:
+        type: string
+        minLength: 3
+      email:
+        type: string
+        format: email
+      role:
+        type: string
+        enum: ["admin", "user", "guest"]
+```
+
+Reference models in request bodies and responses:
+
+```yaml
+request_body:
+  schema: User
+```
+
+### Behavior
+
+Configure global behavior for your service:
+
+```yaml
+behavior:
+  latency:
+    min_ms: 100
+    max_ms: 300
+  error_simulation:
+    enabled: false
+    rate: 0.05  # 5% error rate
+    status_codes: [500, 502, 503]
+  rate_limiting:
+    enabled: false
+    requests_per_minute: 60
+```
+
+<Accordion title="Behavior configuration options">
+
+#### Latency simulation
+
+Add realistic delays to responses:
+
+```yaml
+latency:
+  min_ms: 50    # Minimum delay in milliseconds
+  max_ms: 200   # Maximum delay in milliseconds
+```
+
+The simulator adds a random delay between min and max for each request.
+
+#### Error simulation
+
+Randomly return error responses:
+
+```yaml
+error_simulation:
+  enabled: true
+  rate: 0.1              # 10% of requests fail
+  status_codes: [500, 503]  # Randomly chosen from this list
+```
+
+#### Rate limiting
+
+Limit the number of requests:
+
+```yaml
+rate_limiting:
+  enabled: true
+  requests_per_minute: 100
+```
+
+Requests exceeding the limit receive a 429 status code.
+
+</Accordion>
+
+## Complete example
+
+Here's a complete service definition for a task management API:
+
+```yaml
+name: Tasks API
+version: "1.0"
+description: Simple task management API for demonstration
+
+server:
+  port: 9001
+  base_path: /api/v1
+  cors:
+    enabled: true
+    origins: ["*"]
+
+fixtures:
+  tasks:
+    - id: 1
+      title: "Setup development environment"
+      completed: false
+      created_at: "2024-01-15T10:00:00Z"
+    - id: 2
+      title: "Write unit tests"
+      completed: true
+      created_at: "2024-01-14T15:30:00Z"
+
+endpoints:
+  - method: GET
+    path: /tasks
+    description: Get all tasks
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "tasks": [
+              {{#each fixtures.tasks}}
+              {
+                "id": {{id}},
+                "title": "{{title}}",
+                "completed": {{completed}},
+                "created_at": "{{created_at}}"
+              }{{#unless @last}},{{/unless}}
+              {{/each}}
+            ],
+            "total": {{fixtures.tasks.length}}
+          }
+
+  - method: GET
+    path: /tasks/{id}
+    description: Get a specific task by ID
+    responses:
+      200:
+        condition: "{{eq params.id '1'}}"
+        content_type: application/json
+        body: |
+          {
+            "id": 1,
+            "title": "Setup development environment",
+            "completed": false
+          }
+      404:
+        condition: "{{ne params.id '1'}}"
+        content_type: application/json
+        body: |
+          {"error": "Task not found"}
+
+  - method: POST
+    path: /tasks
+    description: Create a new task
+    request_body:
+      required: true
+      content_type: application/json
+    responses:
+      201:
+        condition: "{{request.body.title}}"
+        content_type: application/json
+        body: |
+          {
+            "id": {{faker "datatype.number" min=100 max=999}},
+            "title": "{{request.body.title}}",
+            "completed": false,
+            "created_at": "{{now}}"
+          }
+      400:
+        condition: "{{not request.body.title}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "message": "Title is required"
+          }
+
+behavior:
+  latency:
+    min_ms: 100
+    max_ms: 300
+```
+
+## Validation
+
+Apicentric validates your service definition when loading it. Common validation errors:
+
+<Warning>
+**Common validation errors:**
+
+- **Path must start with `/`**: Ensure all endpoint paths begin with a forward slash
+- **Invalid HTTP method**: Use standard methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- **Missing responses**: Every endpoint must have at least one response definition
+- **Invalid status code**: Use standard HTTP status codes (200, 201, 400, 404, 500, etc.)
+</Warning>
+
+You can validate a service definition without starting the simulator:
+
+```bash
+apicentric simulator validate --file tasks-api.yaml
+```
+
+## Best practices
+
+<Tip>
+**Follow these best practices for maintainable service definitions:**
+
+1. **Use descriptive names**: Choose clear, meaningful names for services and endpoints
+2. **Add descriptions**: Document what each endpoint does
+3. **Organize fixtures logically**: Group related data together
+4. **Use semantic versioning**: Version your service definitions
+5. **Keep it DRY**: Use fixtures and models to avoid repetition
+6. **Test your templates**: Ensure Handlebars expressions work as expected
+7. **Version control**: Store service definitions in Git
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Fixtures and templating" icon="brackets-curly" href="/concepts/fixtures-and-templating">
+    Learn how to create dynamic responses with Handlebars
+  </Card>
+  
+  <Card title="Scenarios" icon="flask" href="/concepts/scenarios">
+    Simulate different API states and conditions
+  </Card>
+</CardGroup>

@@ -1,0 +1,502 @@
+---
+title: MCP integration
+description: Let AI assistants manage your mock APIs using the Model Context Protocol
+---
+
+Apicentric implements the Model Context Protocol (MCP), enabling AI assistants like Claude, ChatGPT, and other MCP-compatible tools to create, manage, and monitor your mock APIs through natural language.
+
+## What is MCP integration?
+
+The Model Context Protocol (MCP) is an open standard that allows AI models to interact with external tools and services. Apicentric's MCP server exposes API simulation capabilities as tools that AI assistants can invoke, turning your AI into a powerful API development assistant.
+
+### Available MCP tools
+
+- **`list_services`** - List all available mock services
+- **`create_service`** - Create a new service from YAML definition
+- **`start_service`** - Start a specific mock service
+- **`stop_service`** - Stop a running service
+- **`get_service_logs`** - Retrieve logs for a service
+- **`set_scenario`** - Activate a scenario for a service
+
+## Why use MCP integration?
+
+<CardGroup cols={2}>
+  <Card title="Natural language API creation" icon="comments">
+    Describe your API in plain English and let AI generate the complete service definition.
+  </Card>
+  <Card title="Intelligent assistance" icon="brain">
+    AI understands context and can suggest endpoints, responses, and test scenarios.
+  </Card>
+  <Card title="Rapid prototyping" icon="bolt">
+    Go from idea to running mock API in seconds with conversational commands.
+  </Card>
+  <Card title="Automated workflows" icon="gears">
+    Let AI handle repetitive tasks like starting services, checking logs, and debugging.
+  </Card>
+</CardGroup>
+
+## Setup and configuration
+
+<Steps>
+  <Step title="Install Apicentric with MCP support">
+    MCP support is included in most installation methods:
+
+    ```bash
+    # Homebrew (includes MCP)
+    brew install pmaojo/tap/apicentric
+
+    # NPM (includes MCP)
+    npm install -g apicentric
+
+    # Cargo (specify MCP feature)
+    cargo install apicentric --features mcp
+    ```
+
+    Verify MCP is available:
+
+    ```bash
+    apicentric mcp --help
+    ```
+  </Step>
+
+  <Step title="Configure your AI assistant">
+    Add Apicentric to your AI assistant's MCP configuration.
+
+    ### Claude Desktop
+
+    Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+    ```json
+    {
+      "mcpServers": {
+        "apicentric": {
+          "command": "apicentric",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+
+    ### VS Code (with Cline or similar extensions)
+
+    Create `.vscode/mcp.json` in your project:
+
+    ```json
+    {
+      "servers": {
+        "apicentric": {
+          "type": "stdio",
+          "command": "apicentric",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+
+    ### Continue.dev
+
+    Add to `~/.continue/config.json`:
+
+    ```json
+    {
+      "mcpServers": [
+        {
+          "name": "apicentric",
+          "command": "apicentric",
+          "args": ["mcp"]
+        }
+      ]
+    }
+    ```
+  </Step>
+
+  <Step title="Restart your AI assistant">
+    Restart Claude Desktop, VS Code, or your AI tool to load the new MCP configuration.
+  </Step>
+
+  <Step title="Test the connection">
+    In your AI assistant, try:
+
+    ```
+    List my Apicentric services
+    ```
+
+    The AI should use the `list_services` tool and show your mock services.
+  </Step>
+</Steps>
+
+## Example workflows
+
+### Create an API from description
+
+**You:** Create a REST API for managing books with CRUD operations. Include endpoints for listing books, getting book details, creating, updating, and deleting books. Use port 9005.
+
+**AI Assistant:**
+
+1. Uses `create_service` tool to generate:
+
+```yaml books-api.yaml
+name: Books API
+version: "1.0"
+description: REST API for managing books
+server:
+  port: 9005
+  base_path: /api/v1
+
+fixtures:
+  books:
+    - id: 1
+      title: "The Great Gatsby"
+      author: "F. Scott Fitzgerald"
+      year: 1925
+    - id: 2
+      title: "To Kill a Mockingbird"
+      author: "Harper Lee"
+      year: 1960
+
+endpoints:
+  - method: GET
+    path: /books
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "books": {{json fixtures.books}}
+          }
+
+  - method: GET
+    path: /books/{id}
+    responses:
+      200:
+        body: |
+          {
+            "id": {{params.id}},
+            "title": "{{faker \"lorem.words\"}}",
+            "author": "{{faker \"name.fullName\"}}",
+            "year": {{faker "datatype.number" min=1900 max=2024}}
+          }
+
+  - method: POST
+    path: /books
+    responses:
+      201:
+        body: |
+          {
+            "id": {{faker "datatype.number" min=100 max=999}},
+            "title": "{{request.body.title}}",
+            "author": "{{request.body.author}}",
+            "year": {{request.body.year}}
+          }
+
+  - method: PUT
+    path: /books/{id}
+    responses:
+      200:
+        body: |
+          {
+            "id": {{params.id}},
+            "title": "{{request.body.title}}",
+            "author": "{{request.body.author}}",
+            "year": {{request.body.year}}
+          }
+
+  - method: DELETE
+    path: /books/{id}
+    responses:
+      204:
+        body: ""
+```
+
+2. Uses `start_service` to launch the API
+3. Provides test commands:
+
+```bash
+curl http://localhost:9005/api/v1/books
+curl http://localhost:9005/api/v1/books/1
+```
+
+### Debug a service
+
+**You:** My user-api service is returning 500 errors. Can you check the logs?
+
+**AI Assistant:**
+
+1. Uses `get_service_logs` tool
+2. Analyzes error messages
+3. Identifies the issue (e.g., invalid Handlebars template)
+4. Suggests fix or offers to update the service definition
+
+### Simulate different scenarios
+
+**You:** Simulate high load on the payment-api service
+
+**AI Assistant:**
+
+1. Uses `set_scenario` tool with scenario name "high_load"
+2. Confirms activation
+3. Explains that responses will now be delayed according to the scenario configuration
+
+## MCP tool reference
+
+### list_services
+
+Lists all available mock services.
+
+**Input:** None
+
+**Output:**
+```json
+{
+  "services": [
+    {
+      "name": "user-api",
+      "port": 9001,
+      "status": "running"
+    },
+    {
+      "name": "payment-api",
+      "port": 9002,
+      "status": "stopped"
+    }
+  ]
+}
+```
+
+### create_service
+
+Creates a new service from YAML definition.
+
+**Input:**
+```json
+{
+  "name": "my-service",
+  "definition": "name: My Service\nversion: 1.0\n..."
+}
+```
+
+**Output:**
+```json
+{
+  "status": "created",
+  "service_name": "my-service",
+  "file_path": "./my-service.yaml"
+}
+```
+
+### start_service
+
+Starts a specific mock service.
+
+**Input:**
+```json
+{
+  "service_name": "user-api"
+}
+```
+
+**Output:**
+```json
+{
+  "status": "started",
+  "service_name": "user-api",
+  "port": 9001,
+  "base_path": "/api/v1"
+}
+```
+
+### stop_service
+
+Stops a running service.
+
+**Input:**
+```json
+{
+  "service_name": "user-api"
+}
+```
+
+**Output:**
+```json
+{
+  "status": "stopped",
+  "service_name": "user-api"
+}
+```
+
+### get_service_logs
+
+Retrieves recent logs for a service.
+
+**Input:**
+```json
+{
+  "service_name": "user-api",
+  "lines": 50
+}
+```
+
+**Output:**
+```json
+{
+  "service_name": "user-api",
+  "logs": [
+    "[2026-03-01 10:15:23] GET /api/v1/users - 200 OK",
+    "[2026-03-01 10:15:24] POST /api/v1/users - 201 Created"
+  ]
+}
+```
+
+### set_scenario
+
+Activates a scenario for a service.
+
+**Input:**
+```json
+{
+  "service_name": "user-api",
+  "scenario_name": "high_load"
+}
+```
+
+**Output:**
+```json
+{
+  "status": "scenario_activated",
+  "service_name": "user-api",
+  "scenario_name": "high_load"
+}
+```
+
+## Use cases
+
+### Rapid prototyping
+
+**Scenario:** You're designing a new microservice and need to prototype the API quickly.
+
+**With MCP:**
+1. Describe the API to your AI assistant
+2. AI generates complete service definition
+3. AI starts the service automatically
+4. You test immediately with curl or Postman
+
+**Time saved:** Minutes instead of hours
+
+### Learning and experimentation
+
+**Scenario:** You're learning API design patterns and want to experiment.
+
+**With MCP:**
+1. Ask AI to create examples of REST, GraphQL, or other patterns
+2. Compare different approaches
+3. Modify and iterate with natural language
+
+### Team onboarding
+
+**Scenario:** New team member needs to set up development environment.
+
+**With MCP:**
+1. AI lists required services
+2. AI starts all services with one command
+3. AI provides test commands and documentation
+
+### Debugging
+
+**Scenario:** Mock API isn't behaving as expected.
+
+**With MCP:**
+1. Ask AI to check service logs
+2. AI identifies configuration issues
+3. AI suggests fixes based on error patterns
+
+## Advanced configuration
+
+### Custom working directory
+
+Run MCP server in a specific directory:
+
+```json
+{
+  "mcpServers": {
+    "apicentric": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "cwd": "/path/to/your/services"
+    }
+  }
+}
+```
+
+### Environment variables
+
+Pass environment variables to MCP server:
+
+```json
+{
+  "mcpServers": {
+    "apicentric": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "APICENTRIC_LOG_LEVEL": "debug",
+        "SERVICES_DIR": "./mock-services"
+      }
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### MCP server not responding
+
+**Issue:** AI assistant can't connect to Apicentric MCP server.
+
+**Solutions:**
+1. Verify Apicentric is installed: `apicentric --version`
+2. Test MCP server manually: `apicentric mcp --test`
+3. Check AI assistant logs for connection errors
+4. Restart your AI assistant after configuration changes
+
+### Tools not appearing
+
+**Issue:** AI assistant doesn't show Apicentric tools.
+
+**Solutions:**
+1. Verify MCP configuration file syntax (valid JSON)
+2. Ensure `command` path is correct (use full path if needed: `/usr/local/bin/apicentric`)
+3. Restart AI assistant to reload MCP servers
+
+### Permission errors
+
+**Issue:** MCP server can't create or modify files.
+
+**Solutions:**
+1. Check file permissions in your services directory
+2. Run AI assistant with appropriate permissions
+3. Set custom `cwd` in MCP configuration
+
+## Tips and best practices
+
+<Tip>
+Be specific in your requests to AI. Instead of "create an API", say "create a REST API for users with GET, POST, PUT, and DELETE endpoints on port 9001".
+</Tip>
+
+<Tip>
+Ask AI to include examples and test commands when creating services. This provides immediate validation.
+</Tip>
+
+<Note>
+MCP tools run with the same permissions as your AI assistant. Ensure the assistant has write access to your services directory.
+</Note>
+
+<Warning>
+AI-generated service definitions should be reviewed before use in production or critical testing scenarios.
+</Warning>
+
+## Next steps
+
+- Learn about [API simulator](/features/api-simulator) features to understand what AI can create
+- Use [code generation](/features/code-generation) to generate client code from AI-created services
+- Explore the [TUI](/features/tui) for visual monitoring alongside AI-driven management
+- Set up [contract testing](/features/contract-testing) for AI-generated mocks

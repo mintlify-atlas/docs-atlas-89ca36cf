@@ -1,0 +1,93 @@
+---
+title: CLI commands overview
+description: Complete reference for all apicentric CLI commands and global flags
+---
+
+The apicentric CLI provides a comprehensive set of commands for managing API mocks, simulations, and testing workflows.
+
+## Global flags
+
+These flags are available for all commands:
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the apicentric configuration file
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode that overrides the config file. Valid values:
+  - `ci` - Optimized for continuous integration environments
+  - `development` - Development mode with detailed logging
+  - `debug` - Maximum verbosity for troubleshooting
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be executed without making any changes
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage
+</ParamField>
+
+## Available commands
+
+### Core commands
+
+<CardGroup cols={2}>
+  <Card title="simulator" icon="server" href="/cli/simulator">
+    Start, stop, and manage API mock services
+  </Card>
+  
+  <Card title="doctor" icon="stethoscope" href="/cli/doctor">
+    Check your system for potential issues
+  </Card>
+  
+  <Card title="ai" icon="sparkles" href="/cli/ai">
+    Generate API services using AI
+  </Card>
+  
+  <Card title="tui" icon="terminal" href="/cli/tui">
+    Launch interactive terminal dashboard
+  </Card>
+</CardGroup>
+
+### Advanced commands
+
+<CardGroup cols={2}>
+  <Card title="mcp" icon="plug" href="/cli/mcp">
+    Start the Model Context Protocol server
+  </Card>
+  
+  <Card title="twin" icon="microchip" href="/cli/twin">
+    Run IoT digital twin simulations
+  </Card>
+</CardGroup>
+
+## Usage patterns
+
+### Basic execution
+
+```bash
+apicentric <command> [subcommand] [flags]
+```
+
+### With global flags
+
+```bash
+apicentric --config my-config.json --verbose simulator start
+```
+
+### Dry run mode
+
+Test commands without executing them:
+
+```bash
+apicentric --dry-run simulator start --services-dir ./services
+```
+
+## Next steps
+
+Explore the detailed documentation for each command to learn about all available options and use cases.

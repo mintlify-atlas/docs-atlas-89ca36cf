@@ -1,0 +1,445 @@
+---
+title: Request validation
+description: Validate incoming requests against JSON schemas to catch errors early and ensure API contract compliance
+---
+
+Request validation helps you catch integration issues early by ensuring requests match expected schemas. Apicentric validates request bodies, query parameters, headers, and path parameters.
+
+## Why validate requests
+
+- **Catch errors early**: Identify invalid requests before they reach your application
+- **Document expectations**: Schemas serve as live documentation
+- **Contract testing**: Ensure clients send properly formatted data
+- **Debugging**: Get clear error messages when requests don't match
+
+## Basic request body validation
+
+Define the expected structure for request bodies:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /users
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "username": "string",
+          "email": "string",
+          "age": "number"
+        }
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "id": {{faker "datatype.number"}},
+            "username": "{{request.body.username}}",
+            "email": "{{request.body.email}}",
+            "age": {{request.body.age}}
+          }
+      400:
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "message": "Request body does not match expected schema"
+          }
+```
+
+<Steps>
+
+### Test valid request
+
+```bash
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "email": "alice@example.com",
+    "age": 25
+  }'
+```
+
+### Test invalid request
+
+```bash
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "age": "not-a-number"
+  }'
+```
+
+You'll receive a 400 error with validation details.
+
+</Steps>
+
+## Validating query parameters
+
+Define expected query parameters:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /products
+    description: List products with filtering
+    parameters:
+      - name: category
+        in: query
+        required: false
+        type: string
+        description: Filter by product category
+      - name: limit
+        in: query
+        required: false
+        type: integer
+        description: Maximum number of results
+      - name: min_price
+        in: query
+        required: false
+        type: number
+        description: Minimum price filter
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "category": "{{query.category}}",
+            "limit": "{{query.limit}}",
+            "min_price": "{{query.min_price}}",
+            "products": []
+          }
+```
+
+Test it:
+
+```bash
+curl "http://localhost:9000/api/products?category=electronics&limit=10&min_price=99.99"
+```
+
+## Required vs optional fields
+
+Control which fields are mandatory:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /orders
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "customer_id": "number",
+          "items": [{"product_id": "number", "quantity": "number"}],
+          "notes": "string?"
+        }
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "order_id": {{faker "datatype.number" min=1000 max=9999}},
+            "customer_id": {{request.body.customer_id}},
+            "items": {{json request.body.items}},
+            "status": "pending"
+          }
+      422:
+        condition: "{{not request.body.customer_id}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "details": ["customer_id is required"]
+          }
+```
+
+<Note>
+Use the `?` suffix to mark fields as optional: `"field": "string?"`. All fields without `?` are required by default.
+</Note>
+
+## Validating headers
+
+Ensure required headers are present:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /profile
+    description: Get user profile (requires authentication)
+    header_match:
+      Authorization: "Bearer *"
+      X-API-Version: "v1"
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": 1,
+            "name": "User",
+            "email": "user@example.com"
+          }
+      401:
+        content_type: application/json
+        body: |
+          {
+            "error": "Unauthorized",
+            "message": "Missing or invalid Authorization header"
+          }
+```
+
+Test with headers:
+
+```bash
+curl http://localhost:9000/api/profile \
+  -H "Authorization: Bearer abc123" \
+  -H "X-API-Version: v1"
+```
+
+## Complex nested schemas
+
+Validate deeply nested objects:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /checkout
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "customer": {
+            "id": "number",
+            "email": "string"
+          },
+          "items": [
+            {
+              "product_id": "number",
+              "quantity": "number",
+              "price": "number"
+            }
+          ],
+          "shipping": {
+            "address": "string",
+            "city": "string",
+            "zip": "string",
+            "country": "string"
+          },
+          "payment": {
+            "method": "string",
+            "card_last4": "string?"
+          }
+        }
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "checkout_id": {{faker "datatype.uuid"}},
+            "total": {{faker "commerce.price"}},
+            "status": "pending"
+          }
+```
+
+## Validation error responses
+
+Provide helpful error messages when validation fails:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /api/register
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "email": "string",
+          "password": "string",
+          "age": "number"
+        }
+    responses:
+      201:
+        condition: "{{and request.body.email request.body.password}}"
+        content_type: application/json
+        body: |
+          {
+            "id": {{faker "datatype.number"}},
+            "email": "{{request.body.email}}"
+          }
+      400:
+        condition: "{{not request.body.email}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "field": "email",
+            "message": "Email is required"
+          }
+      422:
+        condition: "{{lt request.body.age 18}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "field": "age",
+            "message": "Must be 18 or older"
+          }
+```
+
+## Validating content types
+
+Ensure the correct Content-Type header:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /upload
+    request_body:
+      content_type: multipart/form-data
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "uploaded": true,
+            "filename": "{{request.body.filename}}"
+          }
+      415:
+        content_type: application/json
+        body: |
+          {
+            "error": "Unsupported Media Type",
+            "message": "Expected multipart/form-data"
+          }
+```
+
+## Using validation helpers
+
+Apicentric provides template helpers for common validations:
+
+<CodeGroup>
+
+```yaml Email validation
+responses:
+  400:
+    condition: "{{not (contains request.body.email '@')}}"
+    content_type: application/json
+    body: |
+      {
+        "error": "Invalid email format"
+      }
+```
+
+```yaml Length validation
+responses:
+  400:
+    condition: "{{lt (length request.body.password) 8}}"
+    content_type: application/json
+    body: |
+      {
+        "error": "Password must be at least 8 characters"
+      }
+```
+
+```yaml Range validation
+responses:
+  422:
+    condition: "{{or (lt request.body.age 0) (gt request.body.age 120)}}"
+    content_type: application/json
+    body: |
+      {
+        "error": "Age must be between 0 and 120"
+      }
+```
+
+```yaml Type validation
+responses:
+  400:
+    condition: "{{not (isNumber request.body.quantity)}}"
+    content_type: application/json
+    body: |
+      {
+        "error": "Quantity must be a number"
+      }
+```
+
+</CodeGroup>
+
+## Testing validation
+
+Create a comprehensive test suite:
+
+```bash
+# Valid request
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "email": "alice@example.com", "age": 25}'
+
+# Missing required field
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "age": 25}'
+
+# Wrong type
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "email": "alice@example.com", "age": "not-a-number"}'
+
+# Invalid email format
+curl -X POST http://localhost:9000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "email": "invalid-email", "age": 25}'
+```
+
+## Debugging validation failures
+
+Enable verbose logging to see validation details:
+
+```bash
+apicentric simulator start --services-dir . --verbose
+```
+
+You'll see detailed logs for each request:
+
+```
+📥 Request: POST /api/users
+📋 Headers: {"Content-Type": "application/json"}
+📦 Body: {"username": "alice", "age": 25}
+❌ Validation failed: Missing required field 'email'
+📤 Response: 400 Bad Request
+```
+
+<Warning>
+Validation errors return 400 Bad Request by default. Customize error responses using the `condition` field to return different status codes like 422 Unprocessable Entity.
+</Warning>
+
+## Best practices
+
+1. **Start simple**: Begin with basic type validation, then add complexity
+2. **Clear error messages**: Help developers understand what went wrong
+3. **Document schemas**: Use the `description` field to explain requirements
+4. **Test edge cases**: Validate boundary conditions and invalid inputs
+5. **Use realistic data**: Test with data that matches production scenarios
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Contract testing" icon="check-double" href="/guides/contract-testing-workflow">
+  Validate your mocks against real APIs
+</Card>
+
+<Card title="Import specs" icon="download" href="/guides/importing-specs">
+  Import existing OpenAPI specs with validation
+</Card>
+
+<Card title="Export specs" icon="upload" href="/guides/exporting-specs">
+  Generate OpenAPI specs from your services
+</Card>
+
+<Card title="Creating mocks" icon="wand-magic-sparkles" href="/guides/creating-mock-apis">
+  Learn more about mock API features
+</Card>
+
+</CardGroup>

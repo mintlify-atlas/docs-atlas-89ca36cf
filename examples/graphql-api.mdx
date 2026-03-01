@@ -1,0 +1,604 @@
+---
+title: GraphQL API
+description: Mock GraphQL APIs with schema definitions, queries, mutations, and dynamic resolvers
+---
+
+This example demonstrates how to create a GraphQL API mock with schema definitions and dynamic data. You'll learn how to handle queries, mutations, and return structured GraphQL responses.
+
+## What you'll build
+
+A GraphQL API with:
+- Type-safe schema definitions
+- Query resolvers for fetching data
+- Mutation resolvers for creating data
+- Dynamic response generation
+- Multiple entity types (users, posts)
+
+<Steps>
+
+### Create a basic GraphQL service
+
+Create a file named `graphql-api.yaml`:
+
+```yaml
+name: GraphQL API
+version: "1.0"
+description: A GraphQL API for blog posts and users
+server:
+  port: 9006
+  base_path: /graphql
+
+schema: |
+  type User {
+    id: ID!
+    name: String!
+    email: String!
+    posts: [Post!]!
+  }
+
+  type Post {
+    id: ID!
+    title: String!
+    content: String!
+    author: User!
+    published: Boolean!
+  }
+
+  type Query {
+    user(id: ID!): User
+    users: [User!]!
+    post(id: ID!): Post
+    posts: [Post!]!
+  }
+
+  type Mutation {
+    createUser(name: String!, email: String!): User!
+    createPost(title: String!, content: String!, authorId: ID!): Post!
+  }
+
+fixtures:
+  users:
+    - id: "1"
+      name: "Alice Johnson"
+      email: "alice@example.com"
+    - id: "2"
+      name: "Bob Smith"
+      email: "bob@example.com"
+  posts:
+    - id: "1"
+      title: "Getting Started with GraphQL"
+      content: "GraphQL is a query language for APIs..."
+      authorId: "1"
+      published: true
+    - id: "2"
+      title: "Advanced GraphQL Patterns"
+      content: "Learn about fragments, directives..."
+      authorId: "1"
+      published: false
+
+endpoints:
+  - method: POST
+    path: /graphql
+    description: GraphQL endpoint
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "data": {
+              "users": [
+                {{#each fixtures.users}}
+                {
+                  "id": "{{id}}",
+                  "name": "{{name}}",
+                  "email": "{{email}}",
+                  "posts": [
+                    {{#each (filter ../fixtures.posts authorId=id)}}
+                    {
+                      "id": "{{id}}",
+                      "title": "{{title}}",
+                      "content": "{{content}}",
+                      "published": {{published}}
+                    }{{#unless @last}},{{/unless}}
+                    {{/each}}
+                  ]
+                }{{#unless @last}},{{/unless}}
+                {{/each}}
+              ]
+            }
+          }
+
+  - method: POST
+    path: /graphql
+    description: Create user mutation
+    request_body:
+      content_type: application/json
+    responses:
+      200:
+        condition: "{{contains request.body.query 'createUser'}}"
+        content_type: application/json
+        body: |
+          {
+            "data": {
+              "createUser": {
+                "id": "{{faker 'datatype.uuid'}}",
+                "name": "{{request.body.variables.name}}",
+                "email": "{{request.body.variables.email}}",
+                "posts": []
+              }
+            }
+          }
+```
+
+### Start the GraphQL server
+
+Launch your GraphQL API:
+
+```bash
+apicentric simulator start --services-dir .
+```
+
+The GraphQL endpoint is available at `http://localhost:9006/graphql`.
+
+### Query all users
+
+Fetch all users with their posts:
+
+```bash
+curl -X POST http://localhost:9006/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "{ users { id name email posts { id title published } } }"
+  }'
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "users": [
+      {
+        "id": "1",
+        "name": "Alice Johnson",
+        "email": "alice@example.com",
+        "posts": [
+          {
+            "id": "1",
+            "title": "Getting Started with GraphQL",
+            "published": true
+          },
+          {
+            "id": "2",
+            "title": "Advanced GraphQL Patterns",
+            "published": false
+          }
+        ]
+      },
+      {
+        "id": "2",
+        "name": "Bob Smith",
+        "email": "bob@example.com",
+        "posts": []
+      }
+    ]
+  }
+}
+```
+
+### Query a single user
+
+Fetch a specific user by ID:
+
+```bash
+curl -X POST http://localhost:9006/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "query GetUser($id: ID!) { user(id: $id) { id name email } }",
+    "variables": { "id": "1" }
+  }'
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "1",
+      "name": "Alice Johnson",
+      "email": "alice@example.com"
+    }
+  }
+}
+```
+
+### Create a new user
+
+Execute a mutation to create a user:
+
+```bash
+curl -X POST http://localhost:9006/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "mutation CreateUser($name: String!, $email: String!) { createUser(name: $name, email: $email) { id name email } }",
+    "variables": {
+      "name": "Charlie Davis",
+      "email": "charlie@example.com"
+    }
+  }'
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "createUser": {
+      "id": "a3f2c8d1-4e5b-6c7d-8e9f-0a1b2c3d4e5f",
+      "name": "Charlie Davis",
+      "email": "charlie@example.com",
+      "posts": []
+    }
+  }
+}
+```
+
+### Use GraphQL Playground
+
+For a better development experience, use a GraphQL client:
+
+<CodeGroup>
+
+```bash GraphQL Playground (Chrome)
+open http://localhost:9006/graphql
+```
+
+```bash Altair GraphQL Client
+npm install -g altair
+altair http://localhost:9006/graphql
+```
+
+```bash Insomnia
+# Create new GraphQL request
+# Set URL to http://localhost:9006/graphql
+# Write queries in the query editor
+```
+
+</CodeGroup>
+
+</Steps>
+
+## Key features demonstrated
+
+### Schema definition
+
+Define your GraphQL schema using SDL (Schema Definition Language):
+
+```yaml
+schema: |
+  type User {
+    id: ID!
+    name: String!
+    email: String!
+  }
+
+  type Query {
+    users: [User!]!
+  }
+```
+
+The `!` indicates non-nullable fields.
+
+### Fixtures for GraphQL data
+
+Define test data that matches your schema:
+
+```yaml
+fixtures:
+  users:
+    - id: "1"
+      name: "Alice Johnson"
+      email: "alice@example.com"
+```
+
+### Query resolvers
+
+Map GraphQL queries to response templates:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /graphql
+    responses:
+      200:
+        body: |
+          {
+            "data": {
+              "users": [
+                {{#each fixtures.users}}
+                {"id": "{{id}}", "name": "{{name}}"}
+                {{/each}}
+              ]
+            }
+          }
+```
+
+### Mutation resolvers
+
+Handle create/update/delete operations:
+
+```yaml
+responses:
+  200:
+    condition: "{{contains request.body.query 'createUser'}}"
+    body: |
+      {
+        "data": {
+          "createUser": {
+            "id": "{{faker 'datatype.uuid'}}",
+            "name": "{{request.body.variables.name}}"
+          }
+        }
+      }
+```
+
+<Note>
+Use `{{contains request.body.query 'mutationName'}}` to detect which mutation is being called.
+</Note>
+
+### Variables support
+
+Access GraphQL variables in your templates:
+
+```handlebars
+{{request.body.variables.name}}
+{{request.body.variables.email}}
+{{request.body.variables.id}}
+```
+
+### Nested relationships
+
+Simulate relationships between types:
+
+```yaml
+fixtures:
+  posts:
+    - id: "1"
+      authorId: "1"  # References user.id
+
+endpoints:
+  - method: POST
+    path: /graphql
+    responses:
+      200:
+        body: |
+          "posts": [
+            {{#each (filter fixtures.posts authorId=user.id)}}
+            {"id": "{{id}}", "title": "{{title}}"}
+            {{/each}}
+          ]
+```
+
+## Advanced patterns
+
+### Error handling
+
+Return GraphQL errors for invalid requests:
+
+```yaml
+responses:
+  200:
+    condition: "{{not request.body.variables.email}}"
+    content_type: application/json
+    body: |
+      {
+        "errors": [
+          {
+            "message": "Email is required",
+            "extensions": {
+              "code": "VALIDATION_ERROR",
+              "field": "email"
+            }
+          }
+        ],
+        "data": null
+      }
+```
+
+### Pagination
+
+Implement cursor-based pagination:
+
+```yaml
+schema: |
+  type PageInfo {
+    hasNextPage: Boolean!
+    endCursor: String
+  }
+
+  type UserConnection {
+    edges: [UserEdge!]!
+    pageInfo: PageInfo!
+  }
+
+  type UserEdge {
+    node: User!
+    cursor: String!
+  }
+
+  type Query {
+    users(first: Int, after: String): UserConnection!
+  }
+```
+
+### Fragments
+
+Support GraphQL fragments:
+
+```graphql
+fragment UserInfo on User {
+  id
+  name
+  email
+}
+
+query GetUsers {
+  users {
+    ...UserInfo
+    posts {
+      id
+      title
+    }
+  }
+}
+```
+
+<Tip>
+Fragments work automatically since Apicentric processes the full GraphQL query.
+</Tip>
+
+### Directives
+
+Handle `@include` and `@skip` directives:
+
+```graphql
+query GetUser($id: ID!, $withPosts: Boolean!) {
+  user(id: $id) {
+    id
+    name
+    posts @include(if: $withPosts) {
+      id
+      title
+    }
+  }
+}
+```
+
+## Generate from schema
+
+Create a new GraphQL service from scratch:
+
+```bash
+apicentric simulator new-graphql blog-api
+```
+
+This creates a template with:
+- Basic schema structure
+- Sample types and queries
+- Mutation examples
+- Ready-to-customize fixtures
+
+## Testing with GraphQL clients
+
+### Apollo Client (React)
+
+```typescript
+import { ApolloClient, InMemoryCache, gql } from '@apollo/client';
+
+const client = new ApolloClient({
+  uri: 'http://localhost:9006/graphql',
+  cache: new InMemoryCache(),
+});
+
+const GET_USERS = gql`
+  query GetUsers {
+    users {
+      id
+      name
+      email
+    }
+  }
+`;
+
+const { data } = await client.query({ query: GET_USERS });
+```
+
+### URQL (React/Vue/Svelte)
+
+```typescript
+import { createClient } from 'urql';
+
+const client = createClient({
+  url: 'http://localhost:9006/graphql',
+});
+
+const result = await client
+  .query('{ users { id name } }')
+  .toPromise();
+```
+
+### Relay (React)
+
+```typescript
+import { Environment, Network, RecordSource, Store } from 'relay-runtime';
+
+const environment = new Environment({
+  network: Network.create((params, variables) => {
+    return fetch('http://localhost:9006/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: params.text, variables }),
+    }).then(response => response.json());
+  }),
+  store: new Store(new RecordSource()),
+});
+```
+
+## Best practices
+
+### Type safety
+
+Use code generation for type-safe clients:
+
+```bash
+# Install GraphQL Code Generator
+npm install -D @graphql-codegen/cli
+
+# Generate types from your schema
+graphql-codegen --schema http://localhost:9006/graphql
+```
+
+### Introspection
+
+Enable GraphQL introspection for development:
+
+```graphql
+query IntrospectionQuery {
+  __schema {
+    types {
+      name
+      fields {
+        name
+        type {
+          name
+        }
+      }
+    }
+  }
+}
+```
+
+### Error codes
+
+Use consistent error codes in extensions:
+
+```yaml
+"errors": [
+  {
+    "message": "User not found",
+    "extensions": {
+      "code": "NOT_FOUND",
+      "userId": "{{request.body.variables.id}}"
+    }
+  }
+]
+```
+
+## Next steps
+
+- Add subscriptions for real-time updates
+- Implement authentication with context
+- Create complex nested queries
+- Set up contract testing against a real GraphQL API
+- Export schema for documentation

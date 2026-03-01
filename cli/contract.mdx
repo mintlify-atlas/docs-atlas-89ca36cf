@@ -1,0 +1,220 @@
+---
+title: contract
+description: Contract testing commands for validating API compatibility
+---
+
+<Note>
+Contract testing features are available through the `simulator test` subcommand. See the [simulator documentation](/cli/simulator#test) for details.
+</Note>
+
+Contract testing in apicentric validates that real APIs comply with their service definitions.
+
+## Quick reference
+
+Run contract tests against a real API:
+
+```bash
+apicentric simulator test --path <contract> --url <api-url> --env <environment>
+```
+
+See the [simulator test command](/cli/simulator#test) for:
+- Complete parameter reference
+- Usage examples
+- Output format details
+- Compatibility policies
+
+## What is contract testing?
+
+Contract testing ensures that:
+
+- **API contracts are honored**: Real APIs match their specifications
+- **Breaking changes are detected**: Incompatibilities are caught early
+- **Multiple environments work**: Staging and production stay in sync
+- **Documentation is accurate**: Service definitions reflect reality
+
+## Core concepts
+
+### Contract
+
+A service definition file that specifies:
+- Expected endpoints
+- Request/response schemas
+- Status codes
+- Headers
+
+### Real API
+
+The actual implementation you're testing against:
+- Development server
+- Staging environment
+- Production API
+
+### Compatibility policy
+
+Rules for what constitutes a breaking change:
+- **Strict**: Exact match required
+- **Tolerant**: Allow additional fields
+- **Custom**: Define your own rules
+
+## Test workflow
+
+1. **Define contract**: Create service definition
+2. **Run tests**: Execute against real API
+3. **Review results**: Check compliance score
+4. **Fix issues**: Update API or contract
+5. **Automate**: Add to CI/CD pipeline
+
+## Common use cases
+
+### Development
+
+Verify your API implementation matches the design:
+
+```bash
+apicentric simulator test \
+  --path contracts/users.yaml \
+  --url http://localhost:8080 \
+  --env development
+```
+
+### Staging validation
+
+Ensure staging environment is production-ready:
+
+```bash
+apicentric simulator test \
+  --path contracts/orders.yaml \
+  --url https://staging.example.com \
+  --env staging
+```
+
+### Production monitoring
+
+Continuously verify production API compliance:
+
+```bash
+apicentric simulator test \
+  --path contracts/products.yaml \
+  --url https://api.example.com \
+  --env production \
+  --quiet
+```
+
+### CI/CD integration
+
+Add to your test pipeline:
+
+```yaml
+# .github/workflows/test.yml
+- name: Contract Tests
+  run: |
+    apicentric simulator test \
+      --path contracts/*.yaml \
+      --url ${{ secrets.API_URL }} \
+      --env ci
+```
+
+## Results interpretation
+
+### Compliance score
+
+Percentage of scenarios that passed:
+- **100%**: Perfect compatibility
+- **90-99%**: Minor issues
+- **Below 90%**: Significant problems
+
+### Issue severity
+
+- **Critical**: Breaking changes
+- **Major**: Compatibility problems
+- **Minor**: Documentation mismatches
+- **Info**: Suggestions
+
+### Compatibility status
+
+- **Compatible**: All critical scenarios pass
+- **Incompatible**: Breaking changes detected
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Version contracts" icon="git">
+    Keep contracts in version control alongside code
+  </Card>
+  
+  <Card title="Test early" icon="clock">
+    Run tests during development, not just before release
+  </Card>
+  
+  <Card title="Automate" icon="robot">
+    Integrate into CI/CD for continuous validation
+  </Card>
+  
+  <Card title="Monitor production" icon="eye">
+    Regularly test production APIs for drift
+  </Card>
+</CardGroup>
+
+## Comparison with other testing
+
+| Type | Contract Testing | Unit Testing | Integration Testing |
+|------|------------------|--------------|---------------------|
+| Scope | API interface | Individual functions | Component interaction |
+| Focus | Compatibility | Correctness | Workflow |
+| Speed | Medium | Fast | Slow |
+| Dependencies | Real API | None | Multiple services |
+| Use case | API validation | Logic testing | E2E scenarios |
+
+## Advanced topics
+
+### Multiple environments
+
+Test the same contract across environments:
+
+```bash
+for env in dev staging prod; do
+  apicentric simulator test \
+    --path contract.yaml \
+    --url $ENV_URLS[$env] \
+    --env $env
+done
+```
+
+### Custom validation
+
+Extend validation with custom scripts:
+
+```bash
+apicentric simulator test \
+  --path contract.yaml \
+  --url $API_URL \
+  --env test | \
+  jq '.issues[] | select(.severity == "critical")'
+```
+
+### Regression prevention
+
+Store test results and compare:
+
+```bash
+apicentric simulator test \
+  --path contract.yaml \
+  --url $API_URL \
+  --env prod > results.json
+
+# Compare with baseline
+diff baseline.json results.json
+```
+
+## Related commands
+
+- [simulator test](/cli/simulator#test) - Full command reference
+- [simulator validate](/cli/simulator#validate) - Validate contract syntax
+- [simulator import](/cli/simulator#import) - Import OpenAPI as contract
+
+## Next steps
+
+- Create your first [service definition](/configuration/services)
+- Learn about [contract-driven development](/guides/contract-driven-dev)
+- Set up [CI/CD integration](/guides/ci-cd-contracts)
+- Explore [compatibility policies](/configuration/compatibility-policies)

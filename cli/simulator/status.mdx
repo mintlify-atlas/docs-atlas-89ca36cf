@@ -1,0 +1,189 @@
+---
+title: simulator status
+description: Display the current status of the API simulator and running services
+---
+
+Check the status of the API simulator, including which services are running and their configuration details.
+
+## Usage
+
+```bash
+apicentric simulator status [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--detailed" type="boolean" default="false">
+  Show detailed information about each running service, including port numbers, base paths, endpoint counts, and running status.
+</ParamField>
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be executed without actually checking status (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### Check basic status
+
+```bash
+apicentric simulator status
+```
+
+**Example output when running:**
+
+```
+📊 API Simulator Status
+   Status: 🟢 Running
+   Services: 3 total
+   Active Services: 3
+```
+
+**Example output when stopped:**
+
+```
+📊 API Simulator Status
+   Status: 🔴 Stopped
+   Services: 0 total
+   Active Services: 0
+```
+
+**Example output when not configured:**
+
+```
+📊 API Simulator Status
+   Status: ⚪ Not configured
+   💡 Enable simulator in apicentric.json to see status
+```
+
+### Check detailed status
+
+```bash
+apicentric simulator status --detailed
+```
+
+**Example output:**
+
+```
+📊 API Simulator Status
+   Status: 🟢 Running
+   Services: 3 total
+   Active Services: 3
+
+📋 Service Details:
+   - users (port 8001 base /api/v1) endpoints:5 running:yes
+   - products (port 8002 base /api) endpoints:8 running:yes
+   - orders (port 8003 base /v1) endpoints:6 running:yes
+```
+
+### Dry run mode
+
+```bash
+apicentric simulator status --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would show simulator status (detailed=false)
+```
+
+## Status indicators
+
+The status command displays the following information:
+
+### Basic status
+
+- **🟢 Running** - Simulator is active and services are running
+- **🔴 Stopped** - Simulator is not running
+- **⚪ Not configured** - Simulator is not enabled in configuration
+
+### Service metrics
+
+- **Services** - Total number of service definitions loaded
+- **Active Services** - Number of services currently running
+
+### Detailed information (with `--detailed`)
+
+For each service:
+- **Name** - Service identifier
+- **Port** - HTTP port the service is listening on
+- **Base path** - URL path prefix for all endpoints
+- **Endpoints** - Number of endpoints defined in the service
+- **Running** - Whether the service is currently active
+
+## Use cases
+
+### Quick health check
+
+```bash
+apicentric simulator status
+```
+
+Use this in scripts or CI/CD pipelines to verify the simulator is running.
+
+### Debugging service configuration
+
+```bash
+apicentric simulator status --detailed
+```
+
+View detailed service information to troubleshoot port conflicts or configuration issues.
+
+### Monitor in scripts
+
+```bash
+if apicentric simulator status | grep -q "🟢 Running"; then
+  echo "Simulator is ready"
+else
+  echo "Starting simulator..."
+  apicentric simulator start --services-dir ./services
+fi
+```
+
+## Related commands
+
+- [`simulator start`](/cli/simulator/start) - Start the simulator
+- [`simulator stop`](/cli/simulator/stop) - Stop the simulator
+- [`simulator logs`](/cli/simulator/logs) - View request logs
+
+<Info>
+The status command provides a snapshot of the current state. For real-time monitoring of requests and responses, use the `simulator logs` command with the `--follow` option or the `simulator monitor` command.
+</Info>
+
+## Troubleshooting
+
+### Status shows "Not configured"
+
+Ensure your `apicentric.json` has simulator configuration:
+
+```json
+{
+  "simulator": {
+    "enabled": true
+  }
+}
+```
+
+### Services show as total but not active
+
+This indicates services are defined but not running. Check:
+
+- Port availability conflicts
+- Service definition validation
+- Simulator logs for startup errors

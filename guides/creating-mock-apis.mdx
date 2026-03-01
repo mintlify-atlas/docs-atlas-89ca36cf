@@ -1,0 +1,414 @@
+---
+title: Creating mock APIs
+description: Learn how to create and configure mock APIs using YAML service definitions in Apicentric
+---
+
+Apicentric makes it easy to create realistic mock APIs using simple YAML configuration files. This guide walks you through creating your first mock API and progressively adding advanced features.
+
+## Prerequisites
+
+- Apicentric CLI installed
+- Basic understanding of REST APIs
+- A text editor
+
+## Your first service definition
+
+Create a file named `users-api.yaml` with a basic service definition:
+
+```yaml users-api.yaml
+name: users-api
+server:
+  port: 9000
+  base_path: /api/v1
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          [
+            {"id": 1, "name": "Alice", "email": "alice@example.com"},
+            {"id": 2, "name": "Bob", "email": "bob@example.com"}
+          ]
+```
+
+<Steps>
+
+### Validate your service
+
+Before starting the simulator, validate your configuration:
+
+```bash
+apicentric simulator validate --path users-api.yaml
+```
+
+You should see: `✅ Validation successful`
+
+### Start the simulator
+
+Start your mock API:
+
+```bash
+apicentric simulator start --services-dir .
+```
+
+### Test your endpoint
+
+In a new terminal, test your API:
+
+```bash
+curl http://localhost:9000/api/v1/users
+```
+
+</Steps>
+
+## Adding path parameters
+
+You can create dynamic endpoints with path parameters:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /users/{id}
+    description: Get user by ID
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": "{{params.id}}",
+            "name": "User {{params.id}}",
+            "email": "user{{params.id}}@example.com"
+          }
+      404:
+        content_type: application/json
+        body: |
+          {
+            "error": "User not found",
+            "message": "No user with ID {{params.id}}"
+          }
+```
+
+Test it:
+
+```bash
+curl http://localhost:9000/api/v1/users/42
+```
+
+## Using fixtures for reusable data
+
+Fixtures let you define reusable data that can be referenced across multiple endpoints:
+
+```yaml
+name: users-api
+server:
+  port: 9000
+  base_path: /api/v1
+
+fixtures:
+  users:
+    - id: 1
+      name: "Alice"
+      email: "alice@example.com"
+      role: "admin"
+    - id: 2
+      name: "Bob"
+      email: "bob@example.com"
+      role: "user"
+
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          [
+            {{#each fixtures.users}}
+            {
+              "id": {{id}},
+              "name": "{{name}}",
+              "email": "{{email}}",
+              "role": "{{role}}"
+            }{{#unless @last}},{{/unless}}
+            {{/each}}
+          ]
+```
+
+## Dynamic responses with Handlebars
+
+Apicentric uses Handlebars templates for dynamic response generation:
+
+### Accessing request data
+
+```yaml
+endpoints:
+  - method: POST
+    path: /users
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "id": {{faker "datatype.number" min=1000 max=9999}},
+            "name": "{{request.body.name}}",
+            "email": "{{request.body.email}}",
+            "created_at": "{{now}}"
+          }
+```
+
+### Available template helpers
+
+<CodeGroup>
+
+```yaml Time helpers
+body: |
+  {
+    "timestamp": "{{now}}",
+    "formatted": "{{now format='%Y-%m-%d'}}",
+    "expires_at": "{{now offset=3600}}"
+  }
+```
+
+```yaml Faker helpers
+body: |
+  {
+    "id": {{faker "datatype.number" min=1000 max=9999}},
+    "price": {{faker "commerce.price"}},
+    "email": "{{faker "internet.email"}}",
+    "company": "{{faker "company.name"}}"
+  }
+```
+
+```yaml Random helpers
+body: |
+  {
+    "status": "{{#random}}pending,processing,shipped,delivered{{/random}}",
+    "priority": {{#random min=1 max=5}}{{/random}}
+  }
+```
+
+```yaml Conditional helpers
+body: |
+  {
+    {{#if request.body.email}}
+    "email": "{{request.body.email}}",
+    {{/if}}
+    "error": "{{#not request.body.email}}Email is required{{/not}}"
+  }
+```
+
+</CodeGroup>
+
+## Handling different HTTP methods
+
+Create a full CRUD API:
+
+```yaml
+endpoints:
+  # List all
+  - method: GET
+    path: /products
+    responses:
+      200:
+        content_type: application/json
+        body: '[]'
+
+  # Get one
+  - method: GET
+    path: /products/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: '{"id": "{{params.id}}", "name": "Product {{params.id}}"}'
+
+  # Create
+  - method: POST
+    path: /products
+    responses:
+      201:
+        content_type: application/json
+        body: '{"id": {{faker "datatype.number"}}, "name": "{{request.body.name}}"}'
+
+  # Update
+  - method: PUT
+    path: /products/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: '{"id": "{{params.id}}", "updated": true}'
+
+  # Delete
+  - method: DELETE
+    path: /products/{id}
+    responses:
+      204:
+        content_type: text/plain
+        body: ''
+```
+
+## Adding CORS support
+
+Enable CORS for frontend development:
+
+```yaml
+server:
+  port: 9000
+  base_path: /api
+  cors:
+    enabled: true
+    origins: ["http://localhost:3000", "http://localhost:5173"]
+```
+
+<Info>
+Use `origins: ["*"]` for development, but specify exact origins for production.
+</Info>
+
+## Simulating delays
+
+Add realistic network latency:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /slow-endpoint
+    responses:
+      200:
+        content_type: application/json
+        body: '{"message": "This was slow"}'
+        delay_ms: 2000
+```
+
+Or add random delays across all endpoints:
+
+```yaml
+behavior:
+  response_delays:
+    min_ms: 100
+    max_ms: 500
+```
+
+## Working with query parameters
+
+Access query parameters in your responses:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /search
+    parameters:
+      - name: q
+        in: query
+        required: true
+        type: string
+      - name: limit
+        in: query
+        required: false
+        type: integer
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "query": "{{query.q}}",
+            "limit": "{{query.limit}}",
+            "results": []
+          }
+```
+
+Test it:
+
+```bash
+curl "http://localhost:9000/api/search?q=hello&limit=10"
+```
+
+## Conditional responses
+
+Return different responses based on request data:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /login
+    responses:
+      200:
+        condition: "{{eq request.body.password 'secret'}}"
+        content_type: application/json
+        body: |
+          {
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "user": {"id": 1, "email": "{{request.body.email}}"}
+          }
+      401:
+        condition: "{{ne request.body.password 'secret'}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Invalid credentials"
+          }
+```
+
+## Adding custom headers
+
+Return custom headers in responses:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /auth
+    responses:
+      200:
+        content_type: application/json
+        headers:
+          X-Auth-Token: "abc123token"
+          Set-Cookie: "session=xyz; HttpOnly; Secure"
+          X-Rate-Limit: "100"
+        body: '{"authenticated": true}'
+```
+
+## Multiple response scenarios
+
+Define multiple status codes for the same endpoint:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /api/status
+    responses:
+      200:
+        content_type: application/json
+        body: '{"status": "ok"}'
+      500:
+        content_type: application/json
+        body: '{"status": "error", "message": "Internal server error"}'
+      503:
+        content_type: application/json
+        body: '{"status": "maintenance", "message": "Service under maintenance"}'
+```
+
+<Tip>
+By default, Apicentric returns the first matching successful response (2xx). You can use scenarios to control which response is returned. See the [contract testing workflow guide](/guides/contract-testing-workflow) for more details.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Request validation" icon="check" href="/guides/request-validation">
+  Add schema validation to your endpoints
+</Card>
+
+<Card title="Import specs" icon="download" href="/guides/importing-specs">
+  Convert OpenAPI, Postman, or WireMock specs
+</Card>
+
+<Card title="Export specs" icon="upload" href="/guides/exporting-specs">
+  Generate OpenAPI specs and TypeScript types
+</Card>
+
+<Card title="Dockerize services" icon="docker" href="/guides/dockerizing-services">
+  Run your mocks in Docker containers
+</Card>
+
+</CardGroup>

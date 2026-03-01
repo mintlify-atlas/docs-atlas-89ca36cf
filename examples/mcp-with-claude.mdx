@@ -1,0 +1,455 @@
+---
+title: MCP with Claude
+description: Set up Model Context Protocol to enable AI assistants like Claude to create and manage API mocks programmatically
+---
+
+Apicentric supports the **Model Context Protocol (MCP)**, allowing AI assistants like Claude Desktop to interact with your API simulator, create mock services, and manage them through natural language.
+
+## What is MCP?
+
+MCP is an open protocol that enables AI models to securely access external tools and data sources. With MCP, AI assistants can:
+
+- Create and manage mock API services from natural language descriptions
+- Start and stop services dynamically
+- Monitor service logs and status in real-time
+- Generate service definitions without writing YAML manually
+
+<Tip>
+Think of MCP as a bridge between AI assistants and Apicentric's powerful API mocking capabilities.
+</Tip>
+
+## Installation
+
+Install Apicentric with MCP support enabled:
+
+<CodeGroup>
+```bash Homebrew
+brew install pmaojo/tap/apicentric
+# MCP support is included by default
+```
+
+```bash Cargo
+cargo install apicentric --features mcp
+```
+
+```bash NPM
+npm install -g apicentric
+# MCP support is included
+```
+</CodeGroup>
+
+Verify MCP is available:
+
+```bash
+apicentric mcp --help
+```
+
+## Claude Desktop setup
+
+<Steps>
+  <Step title="Locate configuration file">
+    Find your Claude Desktop configuration file:
+    
+    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+    - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+    
+    Create the file if it doesn't exist.
+  </Step>
+  
+  <Step title="Add Apicentric MCP server">
+    Add the following configuration to `claude_desktop_config.json`:
+    
+    ```json
+    {
+      "mcpServers": {
+        "apicentric": {
+          "command": "apicentric",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+    
+    <Note>
+    If you installed Apicentric in a custom location, use the full path to the binary:
+    ```json
+    "command": "/usr/local/bin/apicentric"
+    ```
+    </Note>
+  </Step>
+  
+  <Step title="Restart Claude Desktop">
+    Close and reopen Claude Desktop to load the new configuration.
+  </Step>
+  
+  <Step title="Verify connection">
+    In Claude Desktop, start a conversation and ask:
+    
+    > "Can you list my Apicentric services?"
+    
+    Claude should use the MCP tools to check for available services.
+  </Step>
+</Steps>
+
+## VS Code setup
+
+For VS Code with MCP-compatible extensions:
+
+<Steps>
+  <Step title="Create MCP configuration">
+    Create `.vscode/mcp.json` in your workspace:
+    
+    ```json
+    {
+      "servers": {
+        "apicentric": {
+          "type": "stdio",
+          "command": "apicentric",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Install MCP extension">
+    Install an MCP-compatible extension from the VS Code marketplace that supports the Model Context Protocol.
+  </Step>
+  
+  <Step title="Reload VS Code">
+    Reload the window to activate the MCP server connection.
+  </Step>
+</Steps>
+
+## Available MCP tools
+
+Apicentric exposes these tools through MCP:
+
+### list_services
+
+List all available mock services in the configured directory.
+
+**Usage example:**
+> "Show me all my API services"
+
+### create_service
+
+Create a new service from a YAML definition.
+
+**Parameters:**
+- `name`: Service name
+- `definition`: YAML service definition
+
+**Usage example:**
+> "Create a mock API for a library system with book endpoints"
+
+### start_service
+
+Start a specific mock service.
+
+**Parameters:**
+- `name`: Service name or file path
+
+**Usage example:**
+> "Start the user-api service"
+
+### stop_service
+
+Stop a running service.
+
+**Parameters:**
+- `name`: Service name or identifier
+
+**Usage example:**
+> "Stop the user-api service"
+
+### get_service_logs
+
+Retrieve logs for a specific service.
+
+**Parameters:**
+- `name`: Service name
+- `lines`: Number of log lines to retrieve (optional)
+
+**Usage example:**
+> "Show me the last 50 logs from the products-api"
+
+## Example workflows
+
+### Creating a REST API from scratch
+
+Have Claude create a complete mock API through natural conversation:
+
+<Steps>
+  <Step title="Describe your API">
+    Ask Claude:
+    
+    > "Create a REST API for managing books with the following endpoints:
+    > - GET /books - list all books
+    > - GET /books/{id} - get a specific book
+    > - POST /books - create a new book
+    > - PUT /books/{id} - update a book
+    > - DELETE /books/{id} - delete a book
+    > 
+    > Each book should have: id, title, author, isbn, and published_date"
+  </Step>
+  
+  <Step title="Claude generates the service">
+    Claude will use the `create_service` MCP tool to generate a complete YAML service definition with:
+    - All CRUD endpoints
+    - Request/response schemas
+    - Sample fixtures
+    - Proper validation
+  </Step>
+  
+  <Step title="Start the service">
+    Ask Claude:
+    
+    > "Start the books API service"
+    
+    Claude will use `start_service` to launch the mock API.
+  </Step>
+  
+  <Step title="Test the API">
+    Claude can provide curl examples:
+    
+    > "Show me how to create a new book"
+    
+    ```bash
+    curl -X POST http://localhost:9000/books \
+      -H "Content-Type: application/json" \
+      -d '{
+        "title": "The Rust Programming Language",
+        "author": "Steve Klabnik",
+        "isbn": "978-1718503106",
+        "published_date": "2023-02-28"
+      }'
+    ```
+  </Step>
+</Steps>
+
+### Debugging service issues
+
+Use Claude to troubleshoot problems:
+
+**User:** "My user-api service isn't responding to requests"
+
+**Claude (using MCP tools):**
+1. Uses `get_service_logs` to check for errors
+2. Identifies port conflicts or configuration issues
+3. Suggests fixes based on log analysis
+4. Can restart the service with `stop_service` then `start_service`
+
+### Generating test data
+
+**User:** "Add 10 sample products to the products-api with realistic data"
+
+**Claude:**
+1. Uses `list_services` to find the products-api definition
+2. Creates a service variant with extended fixtures
+3. Uses `create_service` to save the updated version
+4. Restarts the service with new data
+
+## Configuration options
+
+### Custom services directory
+
+Tell Apicentric where to find your service definitions:
+
+```json
+{
+  "mcpServers": {
+    "apicentric": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "APICENTRIC_SERVICES_DIR": "/path/to/services"
+      }
+    }
+  }
+}
+```
+
+### Enable debug logging
+
+Get detailed logs for troubleshooting:
+
+```json
+{
+  "mcpServers": {
+    "apicentric": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "RUST_LOG": "apicentric=debug"
+      }
+    }
+  }
+}
+```
+
+### Multiple service directories
+
+Manage services from different projects:
+
+```json
+{
+  "mcpServers": {
+    "apicentric-project-a": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "APICENTRIC_SERVICES_DIR": "~/projects/project-a/services"
+      }
+    },
+    "apicentric-project-b": {
+      "command": "apicentric",
+      "args": ["mcp"],
+      "env": {
+        "APICENTRIC_SERVICES_DIR": "~/projects/project-b/services"
+      }
+    }
+  }
+}
+```
+
+## Benefits of MCP integration
+
+### Natural language API creation
+
+Describe your API in plain English instead of writing YAML:
+
+**Without MCP:**
+```yaml
+name: User API
+version: "1.0"
+server:
+  port: 9000
+endpoints:
+  - method: GET
+    path: /users
+    # ... many more lines
+```
+
+**With MCP:**
+> "Create a user API with login, registration, and profile endpoints"
+
+### Automated testing setup
+
+Let AI handle service creation and configuration:
+
+> "Create mock services for our microservices architecture:
+> - User service on port 9001
+> - Product service on port 9002  
+> - Order service on port 9003
+> All should support CRUD operations"
+
+### Integrated development workflow
+
+Seamless workflow between AI assistance and API development:
+
+> "My frontend needs a new endpoint GET /users/{id}/preferences that returns user preferences. Add it to the user-api and restart the service."
+
+### Rapid prototyping
+
+Go from idea to working mock API in seconds:
+
+> "Create a payment processing API that mimics Stripe's basic functionality"
+
+## Troubleshooting
+
+### MCP server not connecting
+
+<Warning>
+If Claude Desktop can't connect to the MCP server, check these common issues:
+</Warning>
+
+1. **Verify Apicentric installation:**
+   ```bash
+   which apicentric
+   apicentric --version
+   ```
+
+2. **Check configuration path:**
+   - Ensure you're editing the correct config file for your OS
+   - Verify JSON syntax is valid
+
+3. **Restart Claude Desktop:**
+   - Completely quit and reopen the application
+   - On macOS: `Cmd+Q` to fully quit
+
+4. **Check Claude Desktop logs:**
+   - macOS: `~/Library/Logs/Claude/`
+   - Look for MCP connection errors
+
+### Services not being created
+
+If Claude can't create services:
+
+1. **Check permissions:**
+   ```bash
+   ls -la ~/services/
+   # Ensure write permissions
+   ```
+
+2. **Verify services directory exists:**
+   ```bash
+   mkdir -p ~/services
+   ```
+
+3. **Set environment variable:**
+   ```bash
+   export APICENTRIC_SERVICES_DIR=~/services
+   ```
+
+### Command not found errors
+
+If you see "apicentric: command not found":
+
+1. **Use full path in config:**
+   ```json
+   {
+     "command": "/usr/local/bin/apicentric"
+   }
+   ```
+
+2. **Verify PATH in MCP context:**
+   ```json
+   {
+     "env": {
+       "PATH": "/usr/local/bin:/usr/bin:/bin"
+     }
+   }
+   ```
+
+## Advanced use cases
+
+### Generating OpenAPI specs
+
+> "Create a service definition and export it to OpenAPI 3.0 format"
+
+Claude can:
+1. Create the service with `create_service`
+2. Use Apicentric's export functionality
+3. Save the OpenAPI spec to a file
+
+### Contract testing automation
+
+> "Compare my mock user-api against the production API and show me any differences"
+
+Claude can:
+1. Start the mock service
+2. Run contract tests
+3. Analyze the results
+4. Suggest fixes for discrepancies
+
+### Multi-service orchestration
+
+> "Start all services for the e-commerce platform: users, products, cart, and checkout"
+
+Claude can start multiple services in the correct order with proper dependencies.
+
+<Tip>
+Combine MCP with Apicentric's TUI for visual monitoring while Claude manages services programmatically.
+</Tip>

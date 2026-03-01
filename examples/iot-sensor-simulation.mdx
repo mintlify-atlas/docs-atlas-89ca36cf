@@ -1,0 +1,452 @@
+---
+title: IoT sensor simulation
+description: Simulate industrial sensors with real-time telemetry, physics simulation, and MQTT/Modbus protocols
+---
+
+This example demonstrates how to create digital twins of IoT devices that simulate real sensor behavior with physics, publish data over MQTT, and expose Modbus registers. Perfect for testing industrial applications without physical hardware.
+
+## What you'll build
+
+A simulated industrial sensor system with:
+- Temperature sensor with sine wave physics
+- Pressure gauge with critical alerts
+- Real-time MQTT telemetry publishing
+- Modbus TCP server for PLC integration
+- Dynamic state changes and thresholds
+
+<Steps>
+
+### Create a temperature sensor
+
+Create a file named `temperature-sensor.yaml`:
+
+```yaml
+twin:
+  name: industrial-temp-sensor
+  physics:
+    - variable: temperature
+      strategy: sine
+      params:
+        min: 45.0
+        max: 85.0
+    - variable: overheat_alert
+      strategy: script
+      params:
+        code: |
+          if temperature > 80.0 {
+            return true;
+          } else {
+            return false;
+          }
+  transports:
+    - type: mqtt
+      params:
+        broker_url: localhost
+        port: 1883
+        topic_prefix: factory/line1/temp
+    - type: http
+      params:
+        port: 8090
+```
+
+This creates a sensor that:
+- Oscillates temperature between 45°C and 85°C using a sine wave
+- Triggers an alert when temperature exceeds 80°C
+- Publishes to MQTT topic `factory/line1/temp`
+- Exposes HTTP endpoint on port 8090
+
+### Create a pressure gauge
+
+Create a file named `pressure-gauge.yaml`:
+
+```yaml
+twin:
+  name: pressure-gauge
+  physics:
+    - variable: pressure_psi
+      strategy: sine
+      params:
+        min: 100.0
+        max: 150.0
+    - variable: valve_status
+      strategy: script
+      params:
+        code: |
+          if pressure_psi > 140.0 {
+            return "critical";
+          } else {
+            return "normal";
+          }
+  transports:
+    - type: mqtt
+      params:
+        broker_url: localhost
+        port: 1883
+        topic_prefix: pipeline/pressure
+    - type: modbus
+      params:
+        port: 5021
+```
+
+This gauge:
+- Simulates pressure from 100 to 150 PSI
+- Updates valve status to "critical" above 140 PSI
+- Publishes to MQTT and exposes Modbus registers
+
+### Set up MQTT broker
+
+You need an MQTT broker to receive telemetry. Use Mosquitto:
+
+```bash
+# macOS
+brew install mosquitto
+brew services start mosquitto
+
+# Ubuntu/Debian
+sudo apt-get install mosquitto
+sudo systemctl start mosquitto
+
+# Docker
+docker run -d -p 1883:1883 eclipse-mosquitto
+```
+
+### Run the sensors
+
+Start both sensors in separate terminals.
+
+<CodeGroup>
+
+```bash Temperature sensor
+apicentric twin run --device temperature-sensor.yaml
+```
+
+```bash Pressure gauge
+apicentric twin run --device pressure-gauge.yaml
+```
+
+</CodeGroup>
+
+You'll see output like:
+
+```
+✓ Starting digital twin: industrial-temp-sensor
+✓ Physics engine initialized
+✓ MQTT transport connected to localhost:1883
+✓ HTTP server listening on 0.0.0.0:8090
+→ Publishing telemetry every 1s
+```
+
+### Subscribe to MQTT telemetry
+
+Monitor sensor data in real-time:
+
+<CodeGroup>
+
+```bash Temperature data
+mosquitto_sub -h localhost -t "factory/line1/temp/#" -v
+```
+
+```bash Pressure data
+mosquitto_sub -h localhost -t "pipeline/pressure/#" -v
+```
+
+```bash All sensors
+mosquitto_sub -h localhost -t "#" -v
+```
+
+</CodeGroup>
+
+### View the telemetry
+
+You'll receive real-time JSON messages:
+
+```json Temperature sensor output
+{
+  "device": "industrial-temp-sensor",
+  "timestamp": "2024-01-15T14:30:45Z",
+  "temperature": 67.5,
+  "overheat_alert": false
+}
+```
+
+```json Temperature alert triggered
+{
+  "device": "industrial-temp-sensor",
+  "timestamp": "2024-01-15T14:31:12Z",
+  "temperature": 82.3,
+  "overheat_alert": true
+}
+```
+
+```json Pressure gauge output
+{
+  "device": "pressure-gauge",
+  "timestamp": "2024-01-15T14:30:45Z",
+  "pressure_psi": 125.8,
+  "valve_status": "normal"
+}
+```
+
+```json Pressure critical state
+{
+  "device": "pressure-gauge",
+  "timestamp": "2024-01-15T14:31:08Z",
+  "pressure_psi": 145.2,
+  "valve_status": "critical"
+}
+```
+
+### Query via HTTP
+
+The temperature sensor also exposes an HTTP endpoint:
+
+```bash
+curl http://localhost:8090/state
+```
+
+Response:
+
+```json
+{
+  "name": "industrial-temp-sensor",
+  "uptime_seconds": 347,
+  "variables": {
+    "temperature": 72.4,
+    "overheat_alert": false
+  },
+  "last_update": "2024-01-15T14:30:45Z"
+}
+```
+
+### Read Modbus registers
+
+The pressure gauge exposes Modbus TCP registers:
+
+```python Python example
+from pymodbus.client import ModbusTcpClient
+
+client = ModbusTcpClient('localhost', port=5021)
+client.connect()
+
+# Read pressure_psi (register 0)
+result = client.read_holding_registers(0, 1)
+print(f"Pressure: {result.registers[0]} PSI")
+
+# Read valve_status (register 1)
+result = client.read_holding_registers(1, 1)
+status = "critical" if result.registers[0] == 1 else "normal"
+print(f"Valve status: {status}")
+
+client.close()
+```
+
+</Steps>
+
+## Key features demonstrated
+
+### Physics simulation strategies
+
+**Sine wave** - Smooth oscillation between min and max:
+
+```yaml
+physics:
+  - variable: temperature
+    strategy: sine
+    params:
+      min: 45.0
+      max: 85.0
+```
+
+**Script** - Custom logic using Rhai scripting:
+
+```yaml
+physics:
+  - variable: overheat_alert
+    strategy: script
+    params:
+      code: |
+        if temperature > 80.0 {
+          return true;
+        } else {
+          return false;
+        }
+```
+
+<Note>
+You can reference other variables in scripts. The temperature variable is automatically available.
+</Note>
+
+### Actor model architecture
+
+Each twin runs as an independent lightweight process:
+- Isolated state management
+- Concurrent execution
+- No shared memory
+- Crash isolation
+
+### Multi-protocol support
+
+**MQTT** - Publish/subscribe messaging:
+
+```yaml
+transports:
+  - type: mqtt
+    params:
+      broker_url: localhost
+      port: 1883
+      topic_prefix: factory/line1/temp
+```
+
+**Modbus TCP** - Industrial protocol for PLCs:
+
+```yaml
+transports:
+  - type: modbus
+    params:
+      port: 5021
+```
+
+**HTTP** - REST API for debugging:
+
+```yaml
+transports:
+  - type: http
+    params:
+      port: 8090
+```
+
+## Advanced physics strategies
+
+### Noise simulation
+
+Add random variation to sensor readings:
+
+```yaml
+physics:
+  - variable: vibration
+    strategy: noise
+    params:
+      mean: 0.5
+      stddev: 0.1
+```
+
+### Linear change
+
+Simulate gradual increases or decreases:
+
+```yaml
+physics:
+  - variable: fuel_level
+    strategy: linear
+    params:
+      start: 100.0
+      end: 0.0
+      duration_seconds: 3600
+```
+
+### Step function
+
+Switch between discrete states:
+
+```yaml
+physics:
+  - variable: machine_state
+    strategy: step
+    params:
+      values: ["idle", "running", "stopped"]
+      interval_seconds: 10
+```
+
+### Complex scripting
+
+Implement custom formulas:
+
+```yaml
+physics:
+  - variable: power_consumption
+    strategy: script
+    params:
+      code: |
+        let base = 100.0;
+        let load_factor = temperature / 100.0;
+        let time_factor = sin(time / 60.0);
+        return base * load_factor * (1.0 + time_factor * 0.2);
+```
+
+<Tip>
+The `time` variable is automatically available in scripts and represents seconds since the twin started.
+</Tip>
+
+## Real-world use cases
+
+### Factory automation testing
+
+Simulate production line sensors without physical equipment:
+- Temperature monitors
+- Conveyor belt speed sensors
+- Quality control cameras
+- Vibration detectors
+
+### Smart home development
+
+Test home automation systems:
+- Thermostats
+- Motion sensors
+- Smart locks
+- Energy meters
+
+### Automotive diagnostics
+
+Mock vehicle sensors:
+- Engine temperature
+- Fuel level
+- Tire pressure
+- OBD-II data
+
+### Agriculture monitoring
+
+Simulate farm sensors:
+- Soil moisture
+- Weather stations
+- Irrigation systems
+- Greenhouse climate control
+
+## Integration examples
+
+### Node-RED flow
+
+Connect sensors to Node-RED:
+
+1. Add MQTT input node
+2. Set server to `localhost:1883`
+3. Subscribe to `factory/#`
+4. Add function node to process data
+5. Output to dashboard or database
+
+### Grafana dashboard
+
+Visualize sensor data:
+
+1. Install Grafana and InfluxDB
+2. Use Telegraf to subscribe to MQTT topics
+3. Store data in InfluxDB
+4. Create Grafana dashboard with time series panels
+5. Set up alerts for critical thresholds
+
+### PLC integration
+
+Connect to industrial controllers:
+
+1. Configure PLC to read Modbus TCP
+2. Point to `localhost:5021`
+3. Map registers to PLC variables
+4. Use in ladder logic or structured text
+5. Test control algorithms without hardware
+
+## Next steps
+
+- Create multiple sensor fleets with different configurations
+- Add network latency simulation for realistic behavior
+- Implement custom transport protocols
+- Build a complete factory floor simulation
+- Integrate with SCADA systems for testing

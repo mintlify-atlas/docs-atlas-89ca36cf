@@ -1,0 +1,419 @@
+---
+title: TUI (Terminal User Interface)
+description: Interactive terminal dashboard for managing services and viewing logs
+---
+
+Apicentric includes a powerful Terminal User Interface (TUI) that provides an interactive dashboard for managing mock services, viewing real-time logs, and monitoring system status - all without leaving your terminal.
+
+## What is the TUI?
+
+The TUI is a keyboard-driven, full-screen terminal interface that gives you a comprehensive view of your API simulator environment. It combines service management, log monitoring, and configuration inspection into a single, unified interface.
+
+### Key features
+
+- **Real-time service status** - See which services are running and on which ports
+- **Live request logs** - Monitor API requests as they happen
+- **Log filtering** - Filter by service, method, status code, or search terms
+- **Service control** - Start, stop, and manage services interactively
+- **Keyboard navigation** - Fast, mouse-free workflow
+- **Multi-pane layout** - Service list, logs, and actions all visible at once
+- **Endpoint explorer** - Browse available endpoints for each service
+
+## Why use the TUI?
+
+<CardGroup cols={2}>
+  <Card title="Visual monitoring" icon="eye">
+    See request traffic in real-time without parsing log files.
+  </Card>
+  <Card title="Fast debugging" icon="bug">
+    Quickly filter logs to find specific requests or errors.
+  </Card>
+  <Card title="Service management" icon="sliders">
+    Start, stop, and inspect services without remembering CLI commands.
+  </Card>
+  <Card title="Workflow efficiency" icon="bolt">
+    Stay in the terminal with a mouse-free, keyboard-driven interface.
+  </Card>
+</CardGroup>
+
+## Getting started
+
+### Launch the TUI
+
+Simply run:
+
+```bash
+apicentric tui
+```
+
+The TUI will:
+1. Load all service definitions from the current directory
+2. Start any configured services
+3. Display the interactive dashboard
+
+### TUI layout
+
+The interface is divided into several panes:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Apicentric TUI - API Simulator Dashboard               │
+├──────────────────┬──────────────────────────────────────┤
+│                  │                                      │
+│  Service List    │  Request Logs                        │
+│                  │                                      │
+│  ● user-api      │  [10:15:23] GET /users - 200 OK     │
+│    :9001         │  [10:15:24] POST /users - 201       │
+│                  │  [10:15:25] GET /users/123 - 200    │
+│  ● payment-api   │                                      │
+│    :9002         │                                      │
+│                  │                                      │
+│  ○ auth-api      │                                      │
+│    :9003         │                                      │
+│                  │                                      │
+├──────────────────┴──────────────────────────────────────┤
+│ Actions: [s]tart [x]stop [r]eload [f]ilter [?]help    │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Keyboard shortcuts
+
+### Navigation
+
+- **Tab** - Switch between panes (service list, logs, endpoint explorer)
+- **↑/↓** - Navigate within the current pane
+- **PgUp/PgDn** - Scroll logs quickly
+- **Home/End** - Jump to top/bottom
+
+### Service management
+
+- **s** - Start selected service
+- **x** - Stop selected service
+- **r** - Reload service configuration
+- **i** - Inspect service details
+- **e** - Open endpoint explorer
+
+### Log management
+
+- **f** - Open filter dialog
+- **c** - Clear logs
+- **/** - Search logs
+- **n** - Next search result
+- **N** - Previous search result
+
+### General
+
+- **?** - Show help dialog
+- **q** or **Ctrl+C** - Quit TUI
+- **Ctrl+L** - Refresh screen
+
+## Views and modes
+
+### Dashboard view (default)
+
+Shows service list and request logs side-by-side. This is the main view for monitoring activity.
+
+### Endpoint explorer
+
+Press **e** to open the endpoint explorer for the selected service:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Endpoint Explorer - user-api                            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  GET /users                                             │
+│    Description: List all users                          │
+│    Response: 200 OK                                     │
+│                                                         │
+│  GET /users/{id}                                        │
+│    Description: Get user by ID                          │
+│    Parameters: id (path)                                │
+│    Response: 200 OK, 404 Not Found                      │
+│                                                         │
+│  POST /users                                            │
+│    Description: Create new user                         │
+│    Request body: application/json                       │
+│    Response: 201 Created, 422 Unprocessable             │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ [Esc] Back  [↑↓] Navigate  [Enter] Test endpoint       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Config inspector
+
+Press **i** to view detailed service configuration:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Service Configuration - user-api                        │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Name: User API                                         │
+│  Version: 1.0                                           │
+│  Port: 9001                                             │
+│  Base Path: /api/v1                                     │
+│  Endpoints: 5                                           │
+│                                                         │
+│  Scenarios:                                             │
+│    - high_load (delay: 2000ms)                          │
+│    - maintenance (503 response)                         │
+│                                                         │
+│  Current Scenario: default                              │
+│                                                         │
+│  Fixtures:                                              │
+│    - users (2 items)                                    │
+│    - products (10 items)                                │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ [Esc] Back  [s] Change scenario                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Filtering logs
+
+Press **f** to open the filter dialog:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Filter Logs                                             │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Service: [user-api        ▼]                           │
+│  Method:  [GET             ▼]                           │
+│  Status:  [200-299         ▼]                           │
+│  Search:  [____________________]                        │
+│                                                         │
+│  [ Apply ]  [ Clear ]  [ Cancel ]                       │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Filter options
+
+- **Service** - Show logs from specific service only
+- **Method** - Filter by HTTP method (GET, POST, etc.)
+- **Status** - Filter by status code range:
+  - `200-299` - Success responses
+  - `400-499` - Client errors
+  - `500-599` - Server errors
+  - `All` - No filtering
+- **Search** - Text search in request path or response
+
+### Active filters indicator
+
+When filters are active, the status bar shows:
+
+```
+📋 Logs (filtered: service=user-api, method=GET)
+```
+
+## Log entry details
+
+Select a log entry and press **Enter** to see details:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Request Details                                         │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Timestamp: 2026-03-01 10:15:23                         │
+│  Service: user-api                                      │
+│  Method: POST                                           │
+│  Path: /api/v1/users                                    │
+│  Status: 201 Created                                    │
+│  Duration: 45ms                                         │
+│                                                         │
+│  Request Headers:                                       │
+│    Content-Type: application/json                       │
+│    Authorization: Bearer xyz...                         │
+│                                                         │
+│  Request Body:                                          │
+│    {                                                    │
+│      "name": "Alice Johnson",                           │
+│      "email": "alice@example.com"                       │
+│    }                                                    │
+│                                                         │
+│  Response Body:                                         │
+│    {                                                    │
+│      "id": 123,                                         │
+│      "name": "Alice Johnson",                           │
+│      "email": "alice@example.com",                      │
+│      "created_at": "2026-03-01T10:15:23Z"               │
+│    }                                                    │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│ [Esc] Back  [c] Copy response  [r] Replay request       │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Service status indicators
+
+- **🟢 Green dot** - Service is running
+- **🔴 Red dot** - Service is stopped
+- **🟡 Yellow dot** - Service is starting/stopping
+- **⚠️ Warning** - Service has errors
+
+## Practical workflows
+
+### Debugging a failing endpoint
+
+<Steps>
+  <Step title="Open TUI">
+    ```bash
+    apicentric tui
+    ```
+  </Step>
+
+  <Step title="Filter logs">
+    Press **f** and filter by status code `400-499` or `500-599` to see only errors.
+  </Step>
+
+  <Step title="Inspect request">
+    Select the failing request and press **Enter** to see full details including request body and headers.
+  </Step>
+
+  <Step title="Check service config">
+    Press **i** on the service to verify endpoint configuration.
+  </Step>
+
+  <Step title="Reload and test">
+    After fixing the YAML, press **r** to reload the service and test again.
+  </Step>
+</Steps>
+
+### Monitoring multiple services
+
+<Steps>
+  <Step title="Start all services">
+    The TUI automatically starts all configured services on launch.
+  </Step>
+
+  <Step title="Watch the logs">
+    Logs from all services appear in the log pane, color-coded by service.
+  </Step>
+
+  <Step title="Filter by service">
+    Press **f** to focus on one service at a time when debugging.
+  </Step>
+
+  <Step title="Check status">
+    Service list shows which services are active and their ports at a glance.
+  </Step>
+</Steps>
+
+### Testing scenario changes
+
+<Steps>
+  <Step title="Open endpoint explorer">
+    Press **e** to see available scenarios.
+  </Step>
+
+  <Step title="Inspect config">
+    Press **i** to see defined scenarios and their parameters.
+  </Step>
+
+  <Step title="Activate scenario">
+    In the config inspector, press **s** to change scenarios.
+  </Step>
+
+  <Step title="Monitor behavior">
+    Watch logs to verify scenario effects (delays, error rates, etc.).
+  </Step>
+</Steps>
+
+## Configuration
+
+### TUI settings
+
+Configure TUI behavior in `apicentric.json`:
+
+```json
+{
+  "tui": {
+    "log_buffer_size": 1000,  // Max log entries to keep
+    "auto_scroll": true,       // Auto-scroll to new logs
+    "color_scheme": "default", // Color theme
+    "refresh_rate_ms": 100     // UI refresh rate
+  }
+}
+```
+
+### Custom themes
+
+Supported color schemes:
+- `default` - Standard terminal colors
+- `dark` - Dark background optimized
+- `light` - Light background optimized
+- `solarized` - Solarized color palette
+
+## Performance tips
+
+<Tip>
+If log scrolling becomes slow, reduce `log_buffer_size` or clear logs periodically with **c**.
+</Tip>
+
+<Tip>
+Use filters to reduce log volume when monitoring high-traffic services.
+</Tip>
+
+<Note>
+The TUI automatically throttles log updates to prevent terminal overload during traffic spikes.
+</Note>
+
+## Troubleshooting
+
+### TUI not rendering correctly
+
+**Issue:** Garbled display or incorrect colors.
+
+**Solutions:**
+- Ensure your terminal supports 256 colors: `echo $TERM` should show `xterm-256color` or similar
+- Try resizing the terminal window (minimum 80x24)
+- Use a modern terminal emulator (iTerm2, Alacritty, Windows Terminal)
+
+### Service won't start
+
+**Issue:** Service shows red dot and won't start.
+
+**Solutions:**
+1. Press **i** to inspect service configuration
+2. Check for YAML syntax errors
+3. Verify port is not already in use
+4. Press **r** to reload after fixing issues
+
+### Logs not appearing
+
+**Issue:** Request logs aren't showing up.
+
+**Solutions:**
+- Check if filters are active (status bar shows filter indicator)
+- Press **f** and click "Clear" to remove all filters
+- Verify the service is actually receiving requests
+- Press **Ctrl+L** to refresh the display
+
+## Tips and best practices
+
+<Tip>
+Keep the TUI open in a dedicated terminal window or tmux pane for continuous monitoring.
+</Tip>
+
+<Tip>
+Use the search feature (**/**) to quickly find requests containing specific IDs or paths.
+</Tip>
+
+<Warning>
+The TUI suppresses console logging to prevent interference. Use the log pane for all debugging information.
+</Warning>
+
+<Note>
+The TUI requires the `tui` feature, which is included in most installation methods. If unavailable, reinstall with: `cargo install apicentric --features tui`
+</Note>
+
+## Next steps
+
+- Monitor [API simulator](/features/api-simulator) services in real-time
+- View [contract testing](/features/contract-testing) results in the TUI
+- Manage [digital twins](/features/iot-digital-twins) through the interface
+- Combine with [MCP integration](/features/mcp-integration) for AI-assisted monitoring

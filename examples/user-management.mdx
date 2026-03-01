@@ -1,0 +1,436 @@
+---
+title: User management API
+description: Create a CRUD API for user management with authentication, validation, and error handling
+---
+
+This example shows you how to build a complete user management API with full CRUD operations, request validation, conditional responses, and different testing scenarios.
+
+## What you'll build
+
+A REST API with:
+- List all users
+- Get user by ID with 404 handling
+- Create new users with validation
+- Update existing users
+- Delete users
+- CORS support
+- Slow response and error scenarios
+
+<Steps>
+
+### Create the service definition
+
+Create a file named `user-api.yaml`:
+
+```yaml
+name: User API
+version: "1.0"
+description: Basic user management API for examples
+server:
+  port: 9001
+  base_path: /api/v1
+  cors: 
+    enabled: true
+    origins: ["*"]
+
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      email: "alice@example.com"
+      role: "admin"
+    - id: 2
+      username: "bob"
+      email: "bob@example.com"
+      role: "user"
+
+endpoints:
+  - method: GET
+    path: /users
+    description: List all users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {{#each fixtures.users}}
+          {
+            "id": {{id}},
+            "username": "{{username}}",
+            "email": "{{email}}",
+            "role": "{{role}}"
+          }{{#unless @last}},{{/unless}}
+          {{/each}}
+
+  - method: GET
+    path: /users/{id}
+    description: Get user by ID
+    responses:
+      200:
+        condition: "{{eq params.id '1'}}"
+        content_type: application/json
+        body: |
+          {
+            "id": 1,
+            "username": "alice",
+            "email": "alice@example.com",
+            "role": "admin"
+          }
+      404:
+        condition: "{{ne params.id '1'}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "User not found",
+            "message": "No user with ID {{params.id}}"
+          }
+
+  - method: POST
+    path: /users
+    description: Create new user
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "id": {{faker "datatype.number"}},
+            "username": "{{request.body.username}}",
+            "email": "{{request.body.email}}",
+            "role": "user",
+            "created_at": "{{now}}"
+          }
+      400:
+        condition: "{{not request.body.email}}"
+        content_type: application/json
+        body: |
+          {
+            "error": "Validation failed",
+            "message": "Email is required"
+          }
+
+scenarios:
+  - name: "slow_response"
+    description: "Simulate slow API responses"
+    delay_ms: 2000
+    endpoints: ["GET /users"]
+    
+  - name: "error_mode"
+    description: "Return errors for testing failure scenarios"
+    endpoints: ["POST /users"]
+    response:
+      status: 503
+      body: |
+        {
+          "error": "Service temporarily unavailable"
+        }
+
+behavior:
+  request_logging: true
+  response_delays: 
+    min_ms: 50
+    max_ms: 200
+```
+
+### Start the simulator
+
+Run the simulator in the directory containing your YAML file:
+
+```bash
+apicentric simulator start --services-dir .
+```
+
+Your API is now running at `http://localhost:9001/api/v1`.
+
+### Test the API
+
+Try out all the CRUD operations.
+
+<CodeGroup>
+
+```bash List all users
+curl http://localhost:9001/api/v1/users
+```
+
+```bash Get user by ID
+curl http://localhost:9001/api/v1/users/1
+```
+
+```bash Get non-existent user (404)
+curl http://localhost:9001/api/v1/users/999
+```
+
+```bash Create a new user
+curl -X POST http://localhost:9001/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "charlie",
+    "email": "charlie@example.com"
+  }'
+```
+
+```bash Create user without email (validation error)
+curl -X POST http://localhost:9001/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "invalid"
+  }'
+```
+
+</CodeGroup>
+
+### View the responses
+
+Successful user list:
+
+```json
+[
+  {
+    "id": 1,
+    "username": "alice",
+    "email": "alice@example.com",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "username": "bob",
+    "email": "bob@example.com",
+    "role": "user"
+  }
+]
+```
+
+Successful user creation:
+
+```json
+{
+  "id": 42567,
+  "username": "charlie",
+  "email": "charlie@example.com",
+  "role": "user",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+Not found error (404):
+
+```json
+{
+  "error": "User not found",
+  "message": "No user with ID 999"
+}
+```
+
+Validation error (400):
+
+```json
+{
+  "error": "Validation failed",
+  "message": "Email is required"
+}
+```
+
+### Test scenarios
+
+Simulate slow API responses:
+
+```bash
+curl http://localhost:9001/api/v1/users \
+  -H "X-Scenario: slow_response"
+```
+
+<Note>
+This adds a 2000ms delay to test loading states in your frontend.
+</Note>
+
+Simulate service errors:
+
+```bash
+curl -X POST http://localhost:9001/api/v1/users \
+  -H "Content-Type: application/json" \
+  -H "X-Scenario: error_mode" \
+  -d '{"username": "test", "email": "test@example.com"}'
+```
+
+You'll receive a 503 response:
+
+```json
+{
+  "error": "Service temporarily unavailable"
+}
+```
+
+</Steps>
+
+## Key features demonstrated
+
+### CORS support
+
+Enable cross-origin requests for frontend development:
+
+```yaml
+server:
+  cors: 
+    enabled: true
+    origins: ["*"]
+```
+
+Now your frontend can make requests from any domain during development.
+
+### Conditional responses
+
+Return different responses based on request data:
+
+```yaml
+responses:
+  200:
+    condition: "{{eq params.id '1'}}"
+    body: |
+      {"id": 1, "username": "alice"}
+  404:
+    condition: "{{ne params.id '1'}}"
+    body: |
+      {"error": "User not found"}
+```
+
+### Request validation
+
+Validate required fields before processing:
+
+```yaml
+400:
+  condition: "{{not request.body.email}}"
+  body: |
+    {
+      "error": "Validation failed",
+      "message": "Email is required"
+    }
+```
+
+### Fixtures for test data
+
+Define reusable user data once:
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      email: "alice@example.com"
+      role: "admin"
+```
+
+Reference in responses with `{{fixtures.users}}`.
+
+### Response delays
+
+Add realistic network latency:
+
+```yaml
+behavior:
+  response_delays: 
+    min_ms: 50
+    max_ms: 200
+```
+
+<Tip>
+Use response delays to test loading states and spinners in your UI.
+</Tip>
+
+### Scenario-based testing
+
+Test different conditions without modifying code:
+
+```yaml
+scenarios:
+  - name: "slow_response"
+    delay_ms: 2000
+    endpoints: ["GET /users"]
+```
+
+Activate with the `X-Scenario` header.
+
+## Generate TypeScript types
+
+Create type-safe client code automatically:
+
+```bash
+apicentric simulator generate-types \
+  --file user-api.yaml \
+  --output user-types.ts
+```
+
+This generates:
+
+```typescript
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  created_at?: string;
+}
+
+export interface CreateUserRequest {
+  username: string;
+  email: string;
+}
+
+export interface ErrorResponse {
+  error: string;
+  message: string;
+}
+```
+
+## Generate React Query hooks
+
+Create ready-to-use React hooks:
+
+```bash
+apicentric simulator generate-query \
+  --file user-api.yaml \
+  --output user-hooks.ts
+```
+
+Use in your React app:
+
+```tsx
+import { useUsers, useCreateUser } from './user-hooks';
+
+function UserList() {
+  const { data: users, isLoading } = useUsers();
+  const createUser = useCreateUser();
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {users.map(user => (
+        <div key={user.id}>{user.username}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Export to OpenAPI
+
+Convert your service to an OpenAPI specification:
+
+```bash
+apicentric simulator export \
+  --file user-api.yaml \
+  --output openapi.json \
+  --format openapi
+```
+
+Now you can:
+- Import into Postman or Insomnia
+- Generate documentation with Swagger UI
+- Share API contracts with your team
+
+## Next steps
+
+- Add update (PUT) and delete (DELETE) endpoints
+- Implement pagination for the user list
+- Add authentication with JWT tokens
+- Set up contract testing against a real API
+- Use the TUI for visual service management: `apicentric tui`

@@ -1,0 +1,267 @@
+---
+title: Common issues
+description: Solutions to common installation and usage problems with Apicentric
+---
+
+This guide covers the most common issues you might encounter when installing or using Apicentric, along with their solutions.
+
+## Installation issues
+
+### Command not found
+
+After installing Apicentric, you may see `apicentric: command not found` when trying to run the CLI.
+
+<Accordion title="Homebrew installation">
+  Ensure Homebrew's bin directory is in your PATH:
+
+  ```bash
+  echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+  source ~/.bashrc
+  ```
+</Accordion>
+
+<Accordion title="Install script">
+  Verify `/usr/local/bin` is in your PATH:
+
+  ```bash
+  echo $PATH | grep -q "/usr/local/bin" && echo "✓ In PATH" || echo "✗ Not in PATH"
+  ```
+
+  If not in PATH, add it to your shell configuration:
+
+  ```bash
+  echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+  ```
+</Accordion>
+
+<Accordion title="Cargo installation">
+  Ensure `~/.cargo/bin` is in your PATH:
+
+  ```bash
+  echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+  ```
+</Accordion>
+
+<Accordion title="Windows">
+  Restart your terminal or PowerShell after installation to refresh the PATH environment variable.
+</Accordion>
+
+### Permission denied
+
+You may encounter permission errors when trying to install Apicentric to system directories.
+
+<Warning>
+  The Unix install script requires sudo access to install to `/usr/local/bin`. If you don't have sudo privileges, use a custom installation directory.
+</Warning>
+
+**Install to a custom directory:**
+
+```bash
+INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+```
+
+Then add the directory to your PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Manual installation with sudo:**
+
+If installing manually, use `sudo` when moving to system directories:
+
+```bash
+sudo mv apicentric /usr/local/bin/
+sudo chmod +x /usr/local/bin/apicentric
+```
+
+### Checksum verification failed
+
+During installation, you may see a checksum mismatch error indicating the download may be corrupted.
+
+<Info>
+  Checksum verification ensures the binary you downloaded matches the official release and hasn't been tampered with.
+</Info>
+
+**Solutions:**
+
+1. Delete the corrupted download and try again:
+
+   ```bash
+   rm apicentric-*.tar.gz
+   curl -LO https://github.com/pmaojo/apicentric/releases/latest/download/apicentric-linux-x64.tar.gz
+   ```
+
+2. Verify you're downloading from the official repository at `github.com/pmaojo/apicentric`
+
+3. Check your internet connection for stability
+
+### Cargo build fails
+
+When building Apicentric from source with Cargo, you may encounter compilation errors.
+
+<Accordion title="Update Rust">
+  Ensure you have the latest stable Rust toolchain:
+
+  ```bash
+  rustup update stable
+  ```
+</Accordion>
+
+<Accordion title="Install system dependencies">
+  **Ubuntu/Debian:**
+
+  ```bash
+  sudo apt-get update
+  sudo apt-get install build-essential pkg-config libssl-dev
+  ```
+
+  **macOS:**
+
+  ```bash
+  xcode-select --install
+  ```
+
+  **Windows:**
+
+  Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/)
+</Accordion>
+
+<Accordion title="Try minimal build">
+  If the full build fails, try building with minimal features:
+
+  ```bash
+  cargo install apicentric --no-default-features --features minimal
+  ```
+</Accordion>
+
+### macOS security warning
+
+On macOS, you may see: "apicentric cannot be opened because it is from an unidentified developer"
+
+<Tip>
+  The Homebrew installation is recommended for macOS as it handles code signing automatically.
+</Tip>
+
+**Solutions:**
+
+1. **Use Homebrew (recommended):**
+
+   ```bash
+   brew install pmaojo/tap/apicentric
+   ```
+
+2. **Remove quarantine attribute:**
+
+   ```bash
+   xattr -d com.apple.quarantine /usr/local/bin/apicentric
+   ```
+
+3. **Build from source:**
+
+   ```bash
+   cargo install apicentric --features cli-tools
+   ```
+
+## Usage issues
+
+### Feature not available
+
+You may see "Feature not available in this build" when trying to use certain commands.
+
+This occurs when you've installed a minimal build that doesn't include all features. Different installation methods include different feature sets.
+
+**Solutions:**
+
+1. **Reinstall with desired features:**
+
+   ```bash
+   cargo install apicentric --features cli-tools --force
+   ```
+
+2. **Install full version via Homebrew:**
+
+   ```bash
+   brew reinstall apicentric  # Homebrew includes cli-tools features
+   ```
+
+**Available feature sets:**
+
+- **Minimal:** Core simulator only
+- **CLI tools:** Simulator, contract testing, and TUI
+- **Full:** All features including TUI, P2P, GraphQL, scripting, and AI
+
+### Port already in use
+
+When starting a service, you may encounter an error that the port is already in use.
+
+<Note>
+  Each service in Apicentric needs its own unique port. Check your service YAML files to ensure no port conflicts.
+</Note>
+
+**Solutions:**
+
+1. **Check what's using the port:**
+
+   ```bash
+   # Linux/macOS
+   lsof -i :9002
+   
+   # Windows
+   netstat -ano | findstr :9002
+   ```
+
+2. **Stop the conflicting service or change your service port in the YAML file:**
+
+   ```yaml
+   server:
+     port: 9003  # Use a different port
+   ```
+
+### Service YAML validation errors
+
+You may encounter validation errors when loading a service definition file.
+
+<Info>
+  Run `apicentric doctor` to check your environment and configuration files.
+</Info>
+
+**Common validation issues:**
+
+- Missing required fields (`name`, `version`, `endpoints`)
+- Invalid YAML syntax (indentation, quotes)
+- Malformed endpoint paths
+- Invalid HTTP methods
+
+**Tips:**
+
+- Use a YAML validator or linter to check syntax
+- Review the service definition examples in the documentation
+- Check the error message for the specific field causing issues
+
+## Getting more help
+
+If you're still experiencing problems after trying these solutions:
+
+1. **Run the doctor command** to diagnose your environment:
+
+   ```bash
+   apicentric doctor
+   ```
+
+2. **Check GitHub Issues** for similar problems:
+   
+   Visit [github.com/pmaojo/apicentric/issues](https://github.com/pmaojo/apicentric/issues)
+
+3. **Create a new issue** with:
+   - Your operating system and version
+   - Installation method used
+   - Complete error message
+   - Output of `apicentric --version` (if available)
+
+4. **Join the Discussions** for community support:
+   
+   Visit [github.com/pmaojo/apicentric/discussions](https://github.com/pmaojo/apicentric/discussions)

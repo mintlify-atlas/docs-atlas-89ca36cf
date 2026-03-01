@@ -1,0 +1,510 @@
+---
+title: Custom templates
+description: Create dynamic API responses using Handlebars templates with built-in helpers and custom extensions
+---
+
+Apicentric uses [Handlebars](https://handlebarsjs.com/) as its templating engine to generate dynamic API responses. You can access request data, fixtures, and runtime state to create realistic, context-aware responses.
+
+## Template basics
+
+Templates use double curly braces `{{}}` to insert dynamic values:
+
+```yaml
+endpoints:
+  - method: GET
+    path: /users/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "id": "{{params.id}}",
+            "name": "{{fixtures.user.name}}",
+            "timestamp": "{{now}}"
+          }
+```
+
+## Context variables
+
+Templates have access to several context objects:
+
+### Request context
+
+```handlebars
+{{request.method}}     # HTTP method (GET, POST, etc.)
+{{request.path}}       # Request path
+{{request.query.key}}  # Query parameter
+{{request.headers.authorization}}  # Request header
+{{request.body.field}} # Request body field
+```
+
+### Path parameters
+
+```handlebars
+# For path /users/{id}
+{{params.id}}
+```
+
+### Fixtures
+
+```handlebars
+# Access fixture data defined in your YAML
+{{fixtures.users}}
+{{fixtures.products.0.name}}
+```
+
+### Runtime data
+
+```handlebars
+# Dynamic data set during request processing
+{{runtime.sessionId}}
+{{runtime.requestCount}}
+```
+
+### Environment variables
+
+```handlebars
+{{env.API_KEY}}
+{{env.BASE_URL}}
+```
+
+## Built-in helpers
+
+Apicentric provides a comprehensive set of Handlebars helpers organized into categories.
+
+### Faker helpers
+
+Generate realistic sample data:
+
+<CodeGroup>
+
+```handlebars Current timestamp
+{{now}}
+# Output: "2026-03-01T12:34:56.789Z"
+```
+
+```handlebars Random UUID
+{{random "uuid"}}
+# Output: "550e8400-e29b-41d4-a716-446655440000"
+```
+
+```handlebars Random number
+{{random "number" 1 100}}
+# Output: Random number between 1 and 100
+```
+
+```handlebars Random string
+{{random_string 10}}
+# Output: 10-character random string
+```
+
+```handlebars Fake email
+{{faker "internet.email"}}
+# Output: "alice@example.com"
+```
+
+```handlebars Fake name
+{{faker "person.name"}}
+# Output: "John Smith"
+```
+
+```handlebars Lorem ipsum
+{{faker "lorem.sentence"}}
+# Output: "Lorem ipsum dolor sit amet."
+```
+
+</CodeGroup>
+
+### Text helpers
+
+String manipulation:
+
+<CodeGroup>
+
+```handlebars Uppercase
+{{upper "hello"}}
+# Output: "HELLO"
+```
+
+```handlebars Lowercase
+{{lower "WORLD"}}
+# Output: "world"
+```
+
+```handlebars Contains check
+{{contains "hello world" "world"}}
+# Output: "true"
+```
+
+```handlebars Starts with
+{{starts_with "hello" "hel"}}
+# Output: "true"
+```
+
+```handlebars Ends with
+{{ends_with "hello" "lo"}}
+# Output: "true"
+```
+
+```handlebars Regex match
+{{matches "test@example.com" ".*@.*"}}
+# Output: "true"
+```
+
+</CodeGroup>
+
+### Math and logic helpers
+
+<CodeGroup>
+
+```handlebars Array length
+{{length fixtures.items}}
+# Output: Number of items in array
+```
+
+```handlebars Logical NOT
+{{not true}}
+# Output: "false"
+```
+
+```handlebars Logical AND
+{{and true true false}}
+# Output: "false"
+```
+
+```handlebars Logical OR
+{{or false true}}
+# Output: "true"
+```
+
+```handlebars Equality
+{{eq request.method "POST"}}
+# Output: "true" or "false"
+```
+
+```handlebars Not equal
+{{ne params.id "123"}}
+# Output: "true" or "false"
+```
+
+```handlebars Greater than
+{{gt 10 5}}
+# Output: "true"
+```
+
+```handlebars Less than or equal
+{{lte 5 10}}
+# Output: "true"
+```
+
+```handlebars Exists check
+{{exists fixtures.user.email}}
+# Output: "true" or "false"
+```
+
+</CodeGroup>
+
+### Core helpers
+
+Data manipulation:
+
+<CodeGroup>
+
+```handlebars Find in array
+{{find fixtures.users "id" 123}}
+# Returns user object where id equals 123
+```
+
+```handlebars Find by field
+{{find_by_field fixtures.products "sku" "ABC123"}}
+# Returns product with matching SKU
+```
+
+```handlebars Find by multiple fields
+{{find_by_multi_field fixtures.items "category" "electronics" "price" 99}}
+# Returns item matching both conditions
+```
+
+```handlebars Filter array
+{{filter fixtures.users "active" true}}
+# Returns array of active users
+```
+
+```handlebars JSON serialization
+{{json fixtures.user}}
+# Converts object to JSON string
+```
+
+```handlebars Merge objects
+{{merge fixtures.user fixtures.profile}}
+# Combines two objects
+```
+
+```handlebars Select fields
+{{select fixtures.user "id" "name" "email"}}
+# Returns object with only specified fields
+```
+
+```handlebars Default value
+{{default params.limit 10}}
+# Returns params.limit or 10 if null/empty
+```
+
+</CodeGroup>
+
+### Bucket helpers
+
+Store and retrieve data across requests:
+
+<CodeGroup>
+
+```handlebars Set value
+{{bucket_set "counter" 42}}
+# Stores value in shared data bucket
+```
+
+```handlebars Get value
+{{bucket_get "counter"}}
+# Retrieves value from bucket
+```
+
+</CodeGroup>
+
+<Info>
+Bucket helpers allow you to maintain state across multiple requests. Use them for counters, session data, or temporary storage.
+</Info>
+
+## Conditional rendering
+
+Use Handlebars built-in `if` helper:
+
+```handlebars
+{{#if (eq request.method "POST")}}
+  {
+    "message": "Resource created",
+    "status": "success"
+  }
+{{else}}
+  {
+    "message": "Resource retrieved"
+  }
+{{/if}}
+```
+
+## Loops
+
+Iterate over arrays:
+
+```handlebars
+{
+  "users": [
+    {{#each fixtures.users}}
+    {
+      "id": "{{this.id}}",
+      "name": "{{this.name}}"
+    }{{#unless @last}},{{/unless}}
+    {{/each}}
+  ]
+}
+```
+
+## Complex example
+
+Combine multiple helpers for realistic responses:
+
+```yaml
+fixtures:
+  products:
+    - id: 1
+      name: "Laptop"
+      price: 999
+      stock: 50
+    - id: 2
+      name: "Mouse"
+      price: 29
+      stock: 200
+
+endpoints:
+  - method: GET
+    path: /products
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "timestamp": "{{now}}",
+            "method": "{{request.method}}",
+            "total": {{length fixtures.products}},
+            {{#if request.query.category}}
+            "filter": "{{request.query.category}}",
+            {{/if}}
+            "products": [
+              {{#each fixtures.products}}
+              {
+                "id": {{this.id}},
+                "name": "{{this.name}}",
+                "price": {{this.price}},
+                "stock": {{this.stock}},
+                "available": {{gt this.stock 0}},
+                "sku": "{{upper this.name}}-{{random_string 6}}"
+              }{{#unless @last}},{{/unless}}
+              {{/each}}
+            ]
+          }
+```
+
+## Creating custom helpers
+
+You can extend the template engine with custom helpers by modifying the source code:
+
+<Steps>
+
+### Create a helper module
+
+Add a new file in `src/simulator/template/helpers/`:
+
+```rust src/simulator/template/helpers/custom.rs
+use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
+
+pub fn register(handlebars: &mut Handlebars) {
+    handlebars.register_helper("reverse", Box::new(reverse_helper));
+}
+
+fn reverse_helper(
+    h: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    if let Some(param) = h.param(0) {
+        if let Some(s) = param.value().as_str() {
+            let reversed: String = s.chars().rev().collect();
+            out.write(&reversed)?;
+        }
+    }
+    Ok(())
+}
+```
+
+### Register the helper
+
+Add to `src/simulator/template/helpers/mod.rs`:
+
+```rust
+pub mod custom;
+```
+
+Then register in `src/simulator/template/mod.rs`:
+
+```rust
+helpers::custom::register(handlebars);
+```
+
+### Use your helper
+
+```handlebars
+{{reverse "hello"}}
+# Output: "olleh"
+```
+
+</Steps>
+
+## Template preprocessor
+
+Apicentric includes a template preprocessor that supports pipe syntax (though the standard Handlebars syntax is recommended).
+
+## Debugging templates
+
+When a template fails to render, you'll see a detailed error:
+
+```
+Template rendering failed: Variable `fixtures.invalid` not found
+Check template syntax and available context variables
+```
+
+<Tip>
+Use the `json` helper to inspect complex objects: `{{json fixtures.user}}`
+</Tip>
+
+## Performance optimization
+
+### Pre-compiled templates
+
+For better performance, compile templates once and reuse:
+
+```rust
+let mut engine = TemplateEngine::new()?;
+
+// Compile template
+engine.compile_template("user_response", template_string)?;
+
+// Render compiled template
+let result = engine.render_compiled("user_response", &context)?;
+```
+
+### Template caching
+
+The template engine automatically handles caching internally when using `render_template()`.
+
+## Best practices
+
+- **Keep templates simple** - Complex logic belongs in scripts or code
+- **Use helpers** - Leverage built-in helpers instead of complex expressions
+- **Validate JSON** - Ensure generated JSON is valid with proper escaping
+- **Test thoroughly** - Test templates with various context values
+- **Use fixtures** - Define test data in fixtures rather than hardcoding
+- **Document context** - Comment which context variables are expected
+
+## Common patterns
+
+### Paginated responses
+
+```handlebars
+{
+  "page": {{default request.query.page 1}},
+  "limit": {{default request.query.limit 10}},
+  "total": {{length fixtures.items}},
+  "items": {{filter fixtures.items "active" true}}
+}
+```
+
+### Error responses
+
+```handlebars
+{{#if (not (exists params.id))}}
+{
+  "error": "validation_error",
+  "message": "ID parameter is required",
+  "timestamp": "{{now}}"
+}
+{{else}}
+{
+  "id": "{{params.id}}",
+  "data": {{find fixtures.items "id" params.id}}
+}
+{{/if}}
+```
+
+### Dynamic headers
+
+Templates can also be used in response headers:
+
+```yaml
+responses:
+  200:
+    headers:
+      X-Request-ID: "{{random 'uuid'}}"
+      X-Timestamp: "{{now}}"
+    body: "..."
+```
+
+## Further reading
+
+- [Handlebars documentation](https://handlebarsjs.com/)
+- [Handlebars expressions](https://handlebarsjs.com/guide/expressions.html)
+- [Handlebars built-ins](https://handlebarsjs.com/guide/builtin-helpers.html)
+
+<Warning>
+Be careful with user input in templates. Always validate and sanitize data to prevent injection attacks.
+</Warning>

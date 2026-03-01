@@ -1,0 +1,360 @@
+---
+title: simulator dockerize
+description: Generate Docker configurations to containerize simulator services
+---
+
+Generate a complete Docker setup (Dockerfile, .dockerignore) to package and deploy your API simulator services as a container.
+
+## Usage
+
+```bash
+apicentric simulator dockerize --file <SERVICE_FILES...> --output <OUTPUT_DIR>
+```
+
+## Arguments
+
+<ParamField path="--file" type="array" required>
+  One or more service definition YAML files to include in the Docker image. Specify multiple files by repeating the flag.
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Output directory where the Dockerfile and service files will be created. The directory will be created if it doesn't exist.
+</ParamField>
+
+## Options
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be generated without actually creating files (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### Dockerize a single service
+
+```bash
+apicentric simulator dockerize --file services/users.yaml --output docker
+```
+
+**Example output:**
+
+```
+🐳 Dockerizing services '["services/users.yaml"]' to 'docker'
+✅ Dockerized services successfully to 'docker'.
+   - Dockerfile and .dockerignore created.
+   - Service 'users.yaml' copied into 'services/' directory.
+
+To build the image, run:
+   cd docker && docker build -t users-service .
+```
+
+### Dockerize multiple services
+
+```bash
+apicentric simulator dockerize \
+  --file services/users.yaml \
+  --file services/products.yaml \
+  --file services/orders.yaml \
+  --output docker-build
+```
+
+**Example output:**
+
+```
+🐳 Dockerizing services '["services/users.yaml", "services/products.yaml", "services/orders.yaml"]' to 'docker-build'
+✅ Dockerized services successfully to 'docker-build'.
+   - Dockerfile and .dockerignore created.
+   - Service 'users.yaml' copied into 'services/' directory.
+   - Service 'products.yaml' copied into 'services/' directory.
+   - Service 'orders.yaml' copied into 'services/' directory.
+
+To build the image, run:
+   cd docker-build && docker build -t users-products-orders-service .
+```
+
+### Dry run mode
+
+```bash
+apicentric simulator dockerize --file services/api.yaml --output docker --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would dockerize services '["services/api.yaml"]' to 'docker'
+```
+
+## Generated files
+
+### Dockerfile
+
+A multi-stage Dockerfile that:
+
+1. **Builder stage** - Compiles Apicentric from source using Rust
+2. **Runtime stage** - Creates a minimal Debian-based image
+3. **Service setup** - Copies service definitions
+4. **Port exposure** - Exposes all ports from service configurations
+5. **Entrypoint** - Starts the simulator with all services
+
+Example generated Dockerfile:
+
+```dockerfile
+# Stage 1: Build the apicentric binary
+FROM rust:1.78 as builder
+
+# Install apicentric from crates.io
+RUN cargo install apicentric --no-default-features --features simulator
+
+# Stage 2: Create the final minimal image
+FROM debian:buster-slim
+
+# Copy the apicentric binary from the builder stage
+COPY --from=builder /usr/local/cargo/bin/apicentric /usr/local/bin/apicentric
+
+# Create a directory for the service definitions
+WORKDIR /app
+COPY --chown=root:root services/ ./services/
+
+# Expose the ports from the service definitions
+EXPOSE 8001
+EXPOSE 8002
+EXPOSE 8003
+
+# Run the apicentric simulator
+ENTRYPOINTRY ["apicentric", "simulator", "start", "--services-dir", "./services"]
+```
+
+### .dockerignore
+
+Excludes unnecessary files from the Docker build context:
+
+```
+# Ignore build artifacts and local state
+target
+.git
+*.db
+```
+
+### Directory structure
+
+After running the command:
+
+```
+docker/
+├── Dockerfile
+├── .dockerignore
+└── services/
+    ├── users.yaml
+    ├── products.yaml
+    └── orders.yaml
+```
+
+## Use cases
+
+### Deploy to production
+
+```bash
+# Generate Docker files
+apicentric simulator dockerize --file services/*.yaml --output deploy
+
+# Build image
+cd deploy
+docker build -t my-api-simulator:v1 .
+
+# Run container
+docker run -p 8080:8080 my-api-simulator:v1
+```
+
+### Use in docker-compose
+
+```bash
+# Generate Dockerfile
+apicentric simulator dockerize --file services/api.yaml --output docker
+
+# Create docker-compose.yml
+cat > docker-compose.yml <<EOF
+version: '3.8'
+services:
+  api-simulator:
+    build: ./docker
+    ports:
+      - "8001:8001"
+      - "8002:8002"
+EOF
+
+# Start with compose
+docker-compose up
+```
+
+### CI/CD integration
+
+```yaml
+# .github/workflows/deploy.yml
+name: Build and Deploy Simulator
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Generate Docker files
+        run: |
+          apicentric simulator dockerize \
+            --file services/*.yaml \
+            --output docker
+      
+      - name: Build Docker image
+        run: |
+          cd docker
+          docker build -t myorg/api-simulator:${{ github.sha }} .
+      
+      - name: Push to registry
+        run: |
+          docker push myorg/api-simulator:${{ github.sha }}
+```
+
+### Kubernetes deployment
+
+```bash
+# Generate and build
+apicentric simulator dockerize --file services/*.yaml --output k8s-build
+cd k8s-build
+docker build -t myregistry/api-sim:v1 .
+docker push myregistry/api-sim:v1
+
+# Create Kubernetes deployment
+kubectl create deployment api-sim --image=myregistry/api-sim:v1
+kubectl expose deployment api-sim --port=8080 --type=LoadBalancer
+```
+
+## Build and run the Docker image
+
+### Build the image
+
+```bash
+cd docker
+docker build -t api-simulator .
+```
+
+### Run the container
+
+```bash
+# Run with port mapping
+docker run -p 8001:8001 -p 8002:8002 api-simulator
+
+# Run in background
+docker run -d -p 8001:8001 api-simulator
+
+# Run with environment variables
+docker run -e MODE=production -p 8001:8001 api-simulator
+```
+
+### View logs
+
+```bash
+docker logs <container-id>
+```
+
+## Customizing the Dockerfile
+
+After generation, you can customize the Dockerfile:
+
+### Pin to a specific version
+
+```dockerfile
+RUN cargo install apicentric --version 0.5.0 --no-default-features --features simulator
+```
+
+### Add health check
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:8001/health || exit 1
+```
+
+### Use Alpine for smaller images
+
+```dockerfile
+FROM alpine:latest
+# Add musl compatibility and other dependencies
+```
+
+## Related commands
+
+- [`simulator start`](/cli/simulator/start) - Start simulator locally
+- [`simulator validate`](/cli/simulator/validate) - Validate services before dockerizing
+- [`simulator export`](/cli/simulator/export) - Export for documentation
+
+<Info>
+The generated Docker image is self-contained and includes the Apicentric binary and all service definitions. It's ready to deploy to any container orchestration platform.
+</Info>
+
+<Warning>
+The build process compiles Apicentric from source, which can take several minutes. Consider using a pre-built base image or caching layers in CI/CD pipelines to speed up builds.
+</Warning>
+
+## Troubleshooting
+
+### Failed to read service file
+
+```
+❌ Failed to read service file 'services/api.yaml': No such file or directory
+💡 Check if the file exists and is readable
+```
+
+**Solution:** Verify all service files exist before running the command.
+
+### Failed to parse service definition
+
+```
+❌ Failed to parse service definition: missing field 'name'
+💡 Ensure the file is valid YAML and contains 'name' and 'server.port' fields
+```
+
+**Solution:** Validate service files first:
+
+```bash
+apicentric simulator validate --file services/api.yaml
+```
+
+### Invalid path
+
+```
+❌ Invalid path 'services/': no filename found
+💡 Ensure the path points to a file, not a directory
+```
+
+**Solution:** Specify individual files, not directories:
+
+```bash
+apicentric simulator dockerize --file services/api.yaml --output docker
+```
+
+### Docker build fails
+
+If `docker build` fails:
+
+- Check Docker is installed and running
+- Ensure you have internet access (to download Rust and dependencies)
+- Check disk space for the build
+- Review build logs for specific errors

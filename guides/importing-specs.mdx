@@ -1,0 +1,474 @@
+---
+title: Importing API specifications
+description: Convert OpenAPI, Postman, WireMock, and Mockoon specs into Apicentric service definitions
+---
+
+Apicentric can import specifications from popular API tools, saving you time when migrating existing mocks or creating new ones from documentation.
+
+## Supported formats
+
+Apicentric automatically detects and imports:
+
+- **OpenAPI 3.x** and **Swagger 2.0** (JSON or YAML)
+- **Postman Collections** (v2.0 and v2.1)
+- **WireMock** stub mappings
+- **Mockoon** environment exports
+- **Insomnia** collections
+
+## Auto-detection import
+
+The simplest way to import is to let Apicentric detect the format:
+
+```bash
+apicentric simulator import --input api-spec.json --output services/api.yaml
+```
+
+Apicentric will:
+1. Read the input file
+2. Detect the format automatically
+3. Convert to Apicentric YAML
+4. Write to the output path
+
+## Importing OpenAPI specs
+
+<Steps>
+
+### From a local file
+
+```bash
+apicentric simulator import \
+  --input openapi.yaml \
+  --output services/my-api.yaml
+```
+
+### From a URL
+
+```bash
+curl https://api.example.com/openapi.json -o openapi.json
+apicentric simulator import \
+  --input openapi.json \
+  --output services/my-api.yaml
+```
+
+### Verify the import
+
+```bash
+apicentric simulator validate --path services/my-api.yaml
+```
+
+### Start the service
+
+```bash
+apicentric simulator start --services-dir services
+```
+
+</Steps>
+
+### What gets imported
+
+From OpenAPI specs, Apicentric extracts:
+
+- **Endpoints**: All paths and HTTP methods
+- **Responses**: Status codes and response bodies
+- **Examples**: Documented example responses (preferred)
+- **Schemas**: Generates JSON from schemas when examples are missing
+- **Parameters**: Path, query, header parameters
+- **Request bodies**: Content types and schemas
+- **Descriptions**: Endpoint and parameter descriptions
+
+<Info>
+Apicentric prefers documented examples over generated data. If your OpenAPI spec includes `examples` fields, those will be used for response bodies.
+</Info>
+
+### OpenAPI import example
+
+Given this OpenAPI spec:
+
+```yaml openapi.yaml
+openapi: 3.0.0
+info:
+  title: Users API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              example:
+                - id: 1
+                  name: Alice
+                - id: 2
+                  name: Bob
+```
+
+Apicentric generates:
+
+```yaml services/users-api.yaml
+name: Users API
+version: "1.0.0"
+server:
+  port: 8000
+  base_path: /
+endpoints:
+  - method: GET
+    path: /users
+    description: List users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          [
+            {"id": 1, "name": "Alice"},
+            {"id": 2, "name": "Bob"}
+          ]
+```
+
+## Importing Postman collections
+
+```bash
+apicentric simulator import \
+  --input postman-collection.json \
+  --output services/api.yaml
+```
+
+### What gets imported
+
+From Postman collections:
+
+- **Requests**: All request methods and URLs
+- **Example responses**: Saved responses from Postman
+- **Headers**: Request and response headers
+- **Request bodies**: JSON, form data, raw text
+- **Variables**: Collection and environment variables (as fixtures)
+- **Folder structure**: Organized into endpoint groups
+
+### Postman import example
+
+Given this Postman collection:
+
+```json postman-collection.json
+{
+  "info": {
+    "name": "My API",
+    "_postman_id": "abc123"
+  },
+  "item": [
+    {
+      "name": "Get User",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/users/{{userId}}"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": "{\"id\": 1, \"name\": \"Alice\"}"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Apicentric generates:
+
+```yaml services/my-api.yaml
+name: My API
+server:
+  port: 8000
+  base_path: /
+endpoints:
+  - method: GET
+    path: /users/{userId}
+    description: Get User
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {"id": "{{params.userId}}", "name": "Alice"}
+```
+
+## Importing WireMock mappings
+
+```bash
+apicentric simulator import \
+  --input wiremock-mappings.json \
+  --output services/api.yaml
+```
+
+### What gets imported
+
+From WireMock stub mappings:
+
+- **Request matchers**: URL patterns and methods
+- **Response definitions**: Status codes and bodies
+- **Headers**: Request and response headers
+- **Multiple responses**: Mapped to scenarios
+- **Body patterns**: Simple equality matchers
+
+<Warning>
+**Limitations**: Advanced WireMock features like transformers, proxying, and state transitions are not automatically imported. You may need to manually adjust the generated YAML.
+</Warning>
+
+### WireMock import example
+
+Given this WireMock mapping:
+
+```json wiremock-mappings.json
+{
+  "request": {
+    "method": "GET",
+    "urlPattern": "/api/users/.*"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"id\": 1, \"name\": \"User\"}",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}
+```
+
+Apicentric generates:
+
+```yaml services/api.yaml
+name: imported-service
+server:
+  port: 8000
+  base_path: /api
+endpoints:
+  - method: GET
+    path: /users/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: '{"id": "{{params.id}}", "name": "User"}'
+```
+
+## Importing Mockoon environments
+
+```bash
+apicentric simulator import \
+  --input mockoon-environment.json \
+  --output services/api.yaml
+```
+
+### What gets imported
+
+From Mockoon environments:
+
+- **Routes**: All defined endpoints
+- **Responses**: Multiple responses per route
+- **Rules**: Response selection rules (as scenarios)
+- **Data buckets**: Shared data (as fixtures)
+- **CORS settings**: CORS configuration
+
+## Importing from URLs
+
+Fetch and import specs directly from URLs:
+
+```bash
+# Import Stripe OpenAPI spec
+curl https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json \
+  -o stripe.json
+apicentric simulator import \
+  --input stripe.json \
+  --output services/stripe-api.yaml
+
+# Import from your API documentation
+curl https://api.example.com/openapi.json -o api-spec.json
+apicentric simulator import \
+  --input api-spec.json \
+  --output services/example-api.yaml
+```
+
+## Batch importing
+
+Import multiple specs at once:
+
+```bash
+#!/bin/bash
+# import-all.sh
+
+for spec in specs/*.json; do
+  name=$(basename "$spec" .json)
+  apicentric simulator import \
+    --input "$spec" \
+    --output "services/${name}.yaml"
+  echo "Imported ${name}"
+done
+```
+
+Run it:
+
+```bash
+chmod +x import-all.sh
+./import-all.sh
+```
+
+## Post-import customization
+
+After importing, you can enhance the generated YAML:
+
+### Add dynamic templates
+
+```yaml
+# Before (static)
+body: '{"id": 1, "name": "Alice"}'
+
+# After (dynamic)
+body: |
+  {
+    "id": {{faker "datatype.number"}},
+    "name": "{{faker "name.firstName"}}",
+    "created_at": "{{now}}"
+  }
+```
+
+### Add fixtures
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      name: "Alice"
+    - id: 2
+      name: "Bob"
+
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        body: |
+          {{#each fixtures.users}}
+          {"id": {{id}}, "name": "{{name}}"}
+          {{#unless @last}},{{/unless}}
+          {{/each}}
+```
+
+### Add scenarios
+
+```yaml
+scenarios:
+  - name: slow_response
+    description: Simulate slow network
+    delay_ms: 3000
+    endpoints: ["GET /users"]
+  
+  - name: error_mode
+    description: Return server errors
+    response:
+      status: 500
+      body: '{"error": "Internal server error"}'
+```
+
+### Add request validation
+
+```yaml
+endpoints:
+  - method: POST
+    path: /users
+    request_body:
+      content_type: application/json
+      schema: |
+        {
+          "name": "string",
+          "email": "string",
+          "age": "number"
+        }
+```
+
+## Comparing formats
+
+| Format | Endpoints | Examples | Schemas | Variables | Scenarios |
+|--------|-----------|----------|---------|-----------|----------|
+| OpenAPI | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Postman | ✅ | ✅ | ⚠️ | ✅ | ❌ |
+| WireMock | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| Mockoon | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
+
+✅ Full support | ⚠️ Partial support | ❌ Not supported
+
+## Troubleshooting
+
+### Import fails with validation error
+
+Check the input file format:
+
+```bash
+# Verify JSON syntax
+jq . input.json
+
+# Verify YAML syntax
+yamlcheck input.yaml
+```
+
+### Missing endpoints after import
+
+Check if paths are correctly formatted in the source spec:
+
+```bash
+apicentric simulator import \
+  --input spec.json \
+  --output services/api.yaml \
+  --verbose
+```
+
+### Generated responses are incomplete
+
+OpenAPI specs without examples will generate minimal responses. Add examples to your spec:
+
+```yaml
+responses:
+  '200':
+    description: Success
+    content:
+      application/json:
+        example:  # Add this
+          id: 1
+          name: Alice
+```
+
+### Import creates invalid YAML
+
+Validate after import:
+
+```bash
+apicentric simulator validate --path services/api.yaml --verbose
+```
+
+Fix any reported issues manually.
+
+<Tip>
+Always validate imported services before starting the simulator. Use `--verbose` to see detailed conversion logs.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Export specs" icon="upload" href="/guides/exporting-specs">
+  Convert Apicentric services back to OpenAPI
+</Card>
+
+<Card title="Request validation" icon="check" href="/guides/request-validation">
+  Add validation to imported endpoints
+</Card>
+
+<Card title="Contract testing" icon="check-double" href="/guides/contract-testing-workflow">
+  Test imported specs against real APIs
+</Card>
+
+<Card title="Creating mocks" icon="wand-magic-sparkles" href="/guides/creating-mock-apis">
+  Enhance imported services with templates
+</Card>
+
+</CardGroup>

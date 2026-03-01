@@ -1,0 +1,540 @@
+---
+title: Scenarios
+description: Simulate different API states and conditions for comprehensive testing
+---
+
+Scenarios allow you to simulate different API states, failure modes, and edge cases without changing your service definition. They're essential for testing error handling, performance under load, and various production conditions.
+
+## What are scenarios?
+
+A **scenario** is a configuration that modifies how your mock API behaves. Scenarios can:
+
+- Add delays to simulate slow responses
+- Return error responses to test failure handling
+- Reduce response rate to simulate server overload
+- Override normal responses with custom data
+- Apply to specific endpoints or all endpoints
+
+You define scenarios in your service definition, then activate them when needed via:
+
+- Command line flags
+- HTTP headers in requests
+- The admin API
+- The TUI interface
+
+## Defining scenarios
+
+Scenarios are defined in the `scenarios` section of your service definition:
+
+```yaml
+scenarios:
+  - name: "slow_api"
+    description: "Simulate slow API responses for performance testing"
+    delay_ms: 3000
+    endpoints: ["GET /tasks", "GET /tasks/{id}"]
+    
+  - name: "high_load"
+    description: "Simulate server under high load"
+    delay_ms: 1000
+    response_rate: 0.7
+    endpoints: ["POST /tasks", "PUT /tasks/{id}"]
+    
+  - name: "maintenance_mode"
+    description: "API in maintenance mode"
+    response:
+      status: 503
+      headers:
+        Retry-After: "1800"
+      body: |
+        {
+          "error": "Service unavailable",
+          "message": "API is currently under maintenance",
+          "retry_after": "30 minutes"
+        }
+```
+
+## Scenario configuration
+
+Each scenario can have the following fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique identifier for the scenario |
+| `description` | string | No | Human-readable description |
+| `delay_ms` | integer | No | Additional delay in milliseconds |
+| `response_rate` | float | No | Success rate (0.0-1.0). Values < 1.0 cause random failures |
+| `endpoints` | array | No | List of endpoints this scenario applies to (defaults to all) |
+| `response` | object | No | Custom response to return instead of normal responses |
+
+## Scenario types
+
+### Latency scenarios
+
+Add delays to simulate network latency or slow backends:
+
+```yaml
+scenarios:
+  - name: "slow_network"
+    description: "Simulate 3G network conditions"
+    delay_ms: 2000
+```
+
+This adds 2 seconds to every response.
+
+<Accordion title="Real-world latency values">
+
+- **Fast network (local)**: 10-50ms
+- **Good WiFi**: 50-100ms
+- **Typical internet**: 100-300ms
+- **3G mobile**: 500-2000ms
+- **Slow connection**: 2000-5000ms
+- **Timeout threshold**: 5000-10000ms
+
+</Accordion>
+
+### Partial failure scenarios
+
+Simulate intermittent failures with `response_rate`:
+
+```yaml
+scenarios:
+  - name: "flaky_service"
+    description: "70% success rate"
+    response_rate: 0.7
+    delay_ms: 500
+```
+
+With a `response_rate` of 0.7:
+- 70% of requests succeed normally
+- 30% of requests fail with a 503 status
+
+<Note>
+The simulator randomly determines whether each request succeeds based on the response rate.
+</Note>
+
+### Custom response scenarios
+
+Override normal responses with scenario-specific data:
+
+```yaml
+scenarios:
+  - name: "maintenance_mode"
+    description: "Service under maintenance"
+    response:
+      status: 503
+      headers:
+        Retry-After: "3600"
+        X-Maintenance-End: "2024-01-15T14:00:00Z"
+      body: |
+        {
+          "error": "Service Unavailable",
+          "message": "Scheduled maintenance in progress",
+          "retry_after_seconds": 3600,
+          "maintenance_window": {
+            "start": "2024-01-15T12:00:00Z",
+            "end": "2024-01-15T14:00:00Z"
+          }
+        }
+```
+
+### Endpoint-specific scenarios
+
+Apply scenarios only to specific endpoints:
+
+```yaml
+scenarios:
+  - name: "slow_writes"
+    description: "Write operations are slow"
+    delay_ms: 2000
+    endpoints:
+      - "POST /tasks"
+      - "PUT /tasks/{id}"
+      - "DELETE /tasks/{id}"
+```
+
+Endpoints are specified as `"METHOD /path"`.
+
+### Combined scenarios
+
+Combine multiple behaviors:
+
+```yaml
+scenarios:
+  - name: "degraded_performance"
+    description: "Slow responses with occasional failures"
+    delay_ms: 1500
+    response_rate: 0.8
+    endpoints: ["GET /tasks", "POST /tasks"]
+```
+
+This scenario:
+- Adds 1.5 second delay
+- Returns errors 20% of the time
+- Applies only to GET and POST /tasks
+
+## Activating scenarios
+
+Scenarios are inactive by default. You can activate them in several ways:
+
+### Command line
+
+Start the simulator with a scenario:
+
+```bash
+apicentric simulator start --scenario slow_api
+```
+
+### HTTP headers
+
+Activate scenarios per-request using the `X-Scenario` header:
+
+```bash
+curl -H "X-Scenario: maintenance_mode" http://localhost:9001/api/v1/tasks
+```
+
+This allows you to test different scenarios without restarting the simulator.
+
+### Admin API
+
+Change scenarios dynamically via the admin API:
+
+```bash
+# Activate a scenario
+curl -X POST http://localhost:9001/__admin/scenario/slow_api
+
+# Deactivate scenarios
+curl -X DELETE http://localhost:9001/__admin/scenario
+```
+
+### TUI
+
+Use the Terminal User Interface to toggle scenarios:
+
+```bash
+apicentric tui
+```
+
+Navigate to the service and press `s` to select a scenario.
+
+## Real-world examples
+
+### E-commerce API scenarios
+
+```yaml
+name: E-commerce API
+version: "1.0"
+
+scenarios:
+  # Black Friday traffic
+  - name: "black_friday"
+    description: "High traffic, slower responses"
+    delay_ms: 2000
+    response_rate: 0.85
+    
+  # Payment gateway timeout
+  - name: "payment_timeout"
+    description: "Payment endpoints timing out"
+    delay_ms: 10000
+    response_rate: 0.5
+    endpoints:
+      - "POST /orders/{id}/payment"
+      - "GET /orders/{id}/payment/status"
+  
+  # Inventory system down
+  - name: "inventory_unavailable"
+    description: "Inventory service unavailable"
+    endpoints:
+      - "GET /products/{id}/stock"
+      - "POST /cart/items"
+    response:
+      status: 503
+      body: |
+        {
+          "error": "Inventory service unavailable",
+          "code": "INVENTORY_DOWN",
+          "retry_after": 60
+        }
+  
+  # Database degradation
+  - name: "db_slow"
+    description: "Database queries are slow"
+    delay_ms: 3000
+    endpoints:
+      - "GET /products"
+      - "GET /orders"
+      - "GET /users/{id}/orders"
+```
+
+### User API scenarios
+
+```yaml
+name: User API
+version: "1.0"
+
+scenarios:
+  # Authentication service issues
+  - name: "auth_failures"
+    description: "Authentication frequently fails"
+    response_rate: 0.6
+    endpoints:
+      - "POST /auth/login"
+      - "POST /auth/refresh"
+    
+  # Rate limiting active
+  - name: "rate_limited"
+    description: "Rate limits being enforced"
+    response:
+      status: 429
+      headers:
+        X-RateLimit-Limit: "100"
+        X-RateLimit-Remaining: "0"
+        X-RateLimit-Reset: "1609459200"
+        Retry-After: "60"
+      body: |
+        {
+          "error": "Rate limit exceeded",
+          "message": "Too many requests. Please try again later.",
+          "limit": 100,
+          "remaining": 0,
+          "reset_at": "2024-01-15T10:30:00Z"
+        }
+  
+  # Email service down
+  - name: "email_service_down"
+    description: "Email verification unavailable"
+    endpoints:
+      - "POST /users/verify-email"
+      - "POST /users/resend-verification"
+    response:
+      status: 503
+      body: |
+        {
+          "error": "Email service unavailable",
+          "code": "EMAIL_SERVICE_DOWN"
+        }
+```
+
+### IoT device API scenarios
+
+```yaml
+name: IoT Device API
+version: "1.0"
+
+scenarios:
+  # Poor connectivity
+  - name: "poor_connectivity"
+    description: "Device has unstable connection"
+    delay_ms: 5000
+    response_rate: 0.5
+    
+  # Battery saving mode
+  - name: "battery_saving"
+    description: "Device is in low-power mode"
+    delay_ms: 2000
+    endpoints:
+      - "GET /device/{id}/telemetry"
+      - "POST /device/{id}/command"
+    
+  # Firmware update in progress
+  - name: "firmware_update"
+    description: "Device unavailable during update"
+    response:
+      status: 503
+      headers:
+        Retry-After: "300"
+      body: |
+        {
+          "error": "Device unavailable",
+          "reason": "Firmware update in progress",
+          "estimated_completion": "2024-01-15T10:35:00Z"
+        }
+```
+
+## Testing with scenarios
+
+### Test error handling
+
+Use scenarios to verify your application handles errors gracefully:
+
+<Steps>
+  <Step title="Define error scenarios">
+    Create scenarios that return various error codes (400, 401, 403, 404, 500, 503).
+  </Step>
+  
+  <Step title="Run your tests">
+    Execute your test suite with different scenarios active.
+  </Step>
+  
+  <Step title="Verify behavior">
+    Ensure your app shows appropriate error messages and retry logic.
+  </Step>
+</Steps>
+
+### Test performance
+
+Simulate slow responses to test loading states and timeouts:
+
+```yaml
+scenarios:
+  - name: "slow_response"
+    delay_ms: 5000
+    
+  - name: "timeout"
+    delay_ms: 30000  # 30 seconds
+```
+
+Run your application and verify:
+- Loading indicators appear
+- Timeout logic triggers correctly
+- User experience remains acceptable
+
+### Test retry logic
+
+Use partial failure scenarios to test retry mechanisms:
+
+```yaml
+scenarios:
+  - name: "intermittent_failures"
+    response_rate: 0.3  # 70% failure rate
+```
+
+Verify your application:
+- Retries failed requests
+- Uses exponential backoff
+- Eventually succeeds when the API recovers
+- Shows appropriate error messages
+
+## Scenario best practices
+
+<Tip>
+**Design effective scenarios:**
+
+1. **Model real conditions**: Base scenarios on actual production issues
+2. **Test edge cases**: Create scenarios for rare but critical failures
+3. **Combine behaviors**: Use delay + response_rate for realistic degradation
+4. **Document scenarios**: Add clear descriptions explaining what each scenario tests
+5. **Use descriptive names**: Choose names that indicate the scenario's purpose
+6. **Cover all endpoints**: Create scenarios for different parts of your API
+</Tip>
+
+<Warning>
+**Avoid these pitfalls:**
+
+- **Unrealistic delays**: Don't use delays longer than your application's timeout
+- **Only testing happy path**: Make sure to test failure scenarios
+- **Forgetting to deactivate**: Remember to turn off scenarios after testing
+- **Overlapping scenarios**: Activating multiple scenarios simultaneously may cause unexpected behavior
+</Warning>
+
+## Scenario patterns
+
+### Gradual degradation
+
+Simulate a system slowly degrading:
+
+```yaml
+scenarios:
+  - name: "degraded_tier_1"
+    description: "Slightly degraded (5% slower)"
+    delay_ms: 200
+    
+  - name: "degraded_tier_2"
+    description: "Moderately degraded (50% slower)"
+    delay_ms: 1000
+    response_rate: 0.95
+    
+  - name: "degraded_tier_3"
+    description: "Severely degraded (80% slower, 20% failures)"
+    delay_ms: 3000
+    response_rate: 0.8
+```
+
+### Cascading failures
+
+Test how one service failing affects others:
+
+```yaml
+scenarios:
+  - name: "database_down"
+    description: "Database unavailable"
+    endpoints:
+      - "GET /users"
+      - "GET /products"
+      - "GET /orders"
+    response:
+      status: 503
+      body: '{"error": "Database unavailable"}'
+  
+  - name: "cache_down"
+    description: "Cache unavailable, slower responses"
+    delay_ms: 2000
+```
+
+### Time-based scenarios
+
+Simulate different behaviors during specific times:
+
+```yaml
+scenarios:
+  - name: "business_hours"
+    description: "Normal load during business hours"
+    delay_ms: 100
+    
+  - name: "peak_hours"
+    description: "High load during peak hours"
+    delay_ms: 500
+    response_rate: 0.95
+    
+  - name: "off_hours"
+    description: "Low load during off hours"
+    delay_ms: 50
+```
+
+## Advanced scenario usage
+
+### Scenario chaining
+
+While Apicentric doesn't support automatic scenario transitions, you can manually orchestrate scenario changes in your tests:
+
+```bash
+# Start with normal behavior
+curl http://localhost:9001/api/tasks
+
+# Activate degraded performance
+curl -X POST http://localhost:9001/__admin/scenario/degraded_tier_1
+curl http://localhost:9001/api/tasks
+
+# Escalate to severe degradation
+curl -X POST http://localhost:9001/__admin/scenario/degraded_tier_3
+curl http://localhost:9001/api/tasks
+
+# Return to normal
+curl -X DELETE http://localhost:9001/__admin/scenario
+```
+
+### Per-request scenarios
+
+Test different scenarios in parallel using headers:
+
+```bash
+# Request A: Normal behavior
+curl http://localhost:9001/api/tasks &
+
+# Request B: Slow response
+curl -H "X-Scenario: slow_api" http://localhost:9001/api/tasks &
+
+# Request C: Error response
+curl -H "X-Scenario: maintenance_mode" http://localhost:9001/api/tasks &
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Service definitions" icon="file-code" href="/concepts/service-definitions">
+    Learn the complete YAML structure
+  </Card>
+  
+  <Card title="Fixtures and templating" icon="brackets-curly" href="/concepts/fixtures-and-templating">
+    Master dynamic response generation
+  </Card>
+</CardGroup>

@@ -1,0 +1,118 @@
+---
+title: simulator stop
+description: Stop the running API simulator and all active services
+---
+
+Stop the API simulator and gracefully shut down all running mock services.
+
+## Usage
+
+```bash
+apicentric simulator stop [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--force" type="boolean" default="false">
+  Force stop the simulator even if it's in an inconsistent state. Use this when normal shutdown fails.
+</ParamField>
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be executed without actually stopping the simulator (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### Stop the simulator
+
+```bash
+apicentric simulator stop
+```
+
+**Example output when simulator is running:**
+
+```
+🛑 Stopping API Simulator...
+✅ API Simulator stopped
+```
+
+**Example output when simulator is not running:**
+
+```
+🛑 Stopping API Simulator...
+⚠️ API Simulator not running
+```
+
+### Force stop the simulator
+
+```bash
+apicentric simulator stop --force
+```
+
+Use this when the simulator is unresponsive or in an error state.
+
+### Dry run mode
+
+```bash
+apicentric simulator stop --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would stop API simulator (force=false)
+```
+
+## How it works
+
+When you run `simulator stop`:
+
+1. The command checks if the simulator is currently active
+2. If active, it sends a shutdown signal to all running services
+3. Each service is gracefully stopped in sequence
+4. Resources are cleaned up and ports are released
+5. The simulator process terminates
+
+<Info>
+If you started the simulator with `simulator start`, pressing Ctrl+C will also stop it gracefully. The `stop` command is useful when the simulator is running in the background or you need to script shutdown operations.
+</Info>
+
+## Related commands
+
+- [`simulator start`](/cli/simulator/start) - Start the API simulator
+- [`simulator status`](/cli/simulator/status) - Check if simulator is running
+- [`simulator logs`](/cli/simulator/logs) - View logs before stopping
+
+## Troubleshooting
+
+### Simulator won't stop
+
+If the simulator doesn't respond to the stop command:
+
+- Use `--force` to force shutdown
+- Check for zombie processes: `ps aux | grep apicentric`
+- Manually kill the process if needed: `kill <PID>`
+
+### Configuration error
+
+If you see "API simulator is not enabled or configured":
+
+- Verify your `apicentric.json` configuration
+- Check that you're in the correct directory
+- Use `--config` to specify the config file path

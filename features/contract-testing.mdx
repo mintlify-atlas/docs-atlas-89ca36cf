@@ -1,0 +1,440 @@
+---
+title: Contract testing
+description: Validate that your mock APIs match real API implementations
+---
+
+Contract testing ensures your mock APIs stay in sync with real API implementations. Apicentric compares mock responses against actual API responses and generates detailed reports highlighting any discrepancies.
+
+## What is contract testing?
+
+Contract testing validates the "contract" between services - the expected request/response format and behavior. With Apicentric, you define scenarios that compare your mock API responses against real API endpoints, ensuring your mocks remain accurate over time.
+
+### Key capabilities
+
+- **Automated validation** of mock vs. real API responses
+- **Schema comparison** for structural differences
+- **Status code verification** to ensure correct HTTP semantics
+- **Header validation** for content types and custom headers
+- **HTML reports** with visual diff highlighting
+- **Compliance scoring** to track API conformance
+- **CI/CD integration** for continuous validation
+
+## Why use contract testing?
+
+<CardGroup cols={2}>
+  <Card title="Prevent drift" icon="arrows-rotate">
+    Detect when real APIs change and your mocks become outdated. Stay synchronized automatically.
+  </Card>
+  <Card title="Confident mocking" icon="shield-check">
+    Trust that your development environment accurately reflects production behavior.
+  </Card>
+  <Card title="Early detection" icon="bell">
+    Catch breaking API changes before they reach production. Validate in CI/CD pipelines.
+  </Card>
+  <Card title="Documentation" icon="file-lines">
+    Generate visual reports showing API behavior and differences over time.
+  </Card>
+</CardGroup>
+
+## How contract testing works
+
+<Steps>
+  <Step title="Create a contract">
+    Define a contract that specifies the real API to validate against:
+
+    ```yaml contract.yaml
+    contract:
+      id: user-api-contract
+      name: "User API Contract"
+      spec_path: ./user-api.yaml
+      real_api:
+        base_url: https://api.production.com
+        headers:
+          Authorization: Bearer ${API_TOKEN}
+      
+      scenarios:
+        - name: "Get user by ID"
+          method: GET
+          path: /users/123
+          expected_status: 200
+          expected_body:
+            id: 123
+            name: "string"
+            email: "string"
+    
+        - name: "List all users"
+          method: GET
+          path: /users
+          expected_status: 200
+    
+        - name: "Create user validation"
+          method: POST
+          path: /users
+          body:
+            name: "Test User"
+            email: "test@example.com"
+          expected_status: 201
+    ```
+  </Step>
+
+  <Step title="Register the contract">
+    Register your contract with Apicentric:
+
+    ```bash
+    apicentric contract register --file contract.yaml
+    ```
+
+    This stores the contract definition for validation.
+  </Step>
+
+  <Step title="Run validation">
+    Execute the contract validation:
+
+    ```bash
+    apicentric contract validate --id user-api-contract
+    ```
+
+    Apicentric will:
+    1. Start your mock API (if needed)
+    2. Send requests to both mock and real APIs
+    3. Compare responses for differences
+    4. Generate a detailed report
+  </Step>
+
+  <Step title="Review the report">
+    Open the generated HTML report:
+
+    ```bash
+    # Report is saved to ./reports/user-api-contract.html
+    open ./reports/user-api-contract.html
+    ```
+
+    The report shows:
+    - Compliance score (0-100%)
+    - Passed vs. failed scenarios
+    - Side-by-side response comparisons
+    - Highlighted differences
+  </Step>
+</Steps>
+
+## Contract definition structure
+
+### Basic contract
+
+```yaml
+contract:
+  id: my-api-contract
+  name: "My API Contract"
+  spec_path: ./service.yaml  # Path to your mock service definition
+  
+  real_api:
+    base_url: https://api.example.com
+    timeout_ms: 5000
+    headers:
+      Authorization: Bearer ${API_TOKEN}
+      X-API-Version: "v1"
+  
+  compatibility_policy:
+    allow_additional_fields: true  # Real API can have extra fields
+    allow_missing_fields: false    # Real API must have all mock fields
+    strict_types: true             # Field types must match exactly
+  
+  scenarios:
+    - name: "Test scenario"
+      method: GET
+      path: /endpoint
+      expected_status: 200
+```
+
+### Scenario options
+
+Each scenario can specify:
+
+```yaml
+scenarios:
+  - name: "Detailed scenario"
+    method: POST
+    path: /api/resource
+    
+    # Request configuration
+    body:
+      field1: "value1"
+      field2: 123
+    
+    headers:
+      Content-Type: application/json
+      X-Custom-Header: "test"
+    
+    # Expected response
+    expected_status: 201
+    expected_body:
+      id: "number"
+      name: "string"
+      created_at: "string"
+    
+    # Validation rules
+    ignore_fields:
+      - created_at  # Ignore timestamp fields
+      - updated_at
+```
+
+## Validation commands
+
+### Register a contract
+
+```bash
+apicentric contract register --file <contract.yaml>
+```
+
+Store a contract definition for later validation.
+
+### List contracts
+
+```bash
+apicentric contract list
+```
+
+Display all registered contracts:
+
+```
+Registered Contracts:
+  - user-api-contract (User API Contract)
+  - payment-api-contract (Payment API Contract)
+```
+
+### Validate a contract
+
+```bash
+apicentric contract validate --id <contract-id> [OPTIONS]
+```
+
+**Options:**
+- `--output <DIR>` - Directory for HTML report (default: `./reports`)
+- `--format <FORMAT>` - Report format: `html`, `json`, or `junit`
+- `--fail-threshold <SCORE>` - Fail if compliance score below threshold (0-100)
+
+### Delete a contract
+
+```bash
+apicentric contract delete --id <contract-id>
+```
+
+Remove a registered contract.
+
+## Compatibility policies
+
+Control how strict the validation is:
+
+### Strict mode
+
+```yaml
+compatibility_policy:
+  allow_additional_fields: false  # Exact match required
+  allow_missing_fields: false
+  strict_types: true
+  strict_arrays: true
+```
+
+Best for critical APIs where exact conformance is required.
+
+### Lenient mode
+
+```yaml
+compatibility_policy:
+  allow_additional_fields: true   # Real API can evolve
+  allow_missing_fields: true      # Mock can be simplified
+  strict_types: false             # Allow type coercion
+  strict_arrays: false            # Array order doesn't matter
+```
+
+Useful for evolving APIs or when mocks are intentionally simplified.
+
+### Recommended mode (default)
+
+```yaml
+compatibility_policy:
+  allow_additional_fields: true   # Real API can add fields
+  allow_missing_fields: false     # Mock must include all fields
+  strict_types: true              # Types must match
+  strict_arrays: true             # Preserve array structure
+```
+
+Balanced approach for most use cases.
+
+## CI/CD integration
+
+Integrate contract testing into your CI pipeline:
+
+### GitHub Actions example
+
+```yaml .github/workflows/contract-test.yml
+name: Contract Testing
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'  # Daily validation
+
+jobs:
+  contract-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Apicentric
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+      
+      - name: Validate contracts
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          apicentric contract validate --id user-api-contract --fail-threshold 95
+      
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: contract-report
+          path: reports/*.html
+```
+
+### GitLab CI example
+
+```yaml .gitlab-ci.yml
+contract-test:
+  stage: test
+  image: ubuntu:latest
+  
+  before_script:
+    - curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+  
+  script:
+    - apicentric contract validate --id payment-api-contract --format junit
+  
+  artifacts:
+    reports:
+      junit: reports/*.xml
+    paths:
+      - reports/*.html
+  
+  only:
+    - main
+    - merge_requests
+```
+
+## Understanding reports
+
+### Compliance score
+
+The compliance score (0-100%) reflects how well your mock matches the real API:
+
+- **100%**: Perfect match, all scenarios pass
+- **90-99%**: Minor differences (extra fields, formatting)
+- **70-89%**: Moderate differences (missing fields, type mismatches)
+- **Below 70%**: Significant differences requiring attention
+
+### Issue types
+
+Reports categorize issues by severity:
+
+<Note>
+**Info**: Minor differences that don't affect functionality (extra fields, field order)
+</Note>
+
+<Warning>
+**Warning**: Moderate issues that may affect some use cases (optional fields missing)
+</Warning>
+
+<Warning>
+**Error**: Critical issues requiring immediate attention (wrong types, missing required fields)
+</Warning>
+
+## Real-world example
+
+Here's a complete contract for a payment API:
+
+```yaml payment-contract.yaml
+contract:
+  id: payment-api-contract
+  name: "Payment API Contract"
+  spec_path: ./payment-api.yaml
+  
+  real_api:
+    base_url: https://api.payments.com
+    headers:
+      Authorization: Bearer ${PAYMENT_API_KEY}
+      X-Idempotency-Key: "${IDEMPOTENCY_KEY}"
+  
+  compatibility_policy:
+    allow_additional_fields: true
+    allow_missing_fields: false
+    strict_types: true
+  
+  scenarios:
+    - name: "Create payment intent"
+      method: POST
+      path: /v1/payment-intents
+      body:
+        amount: 1000
+        currency: "usd"
+        description: "Test payment"
+      expected_status: 201
+      expected_body:
+        id: "string"
+        amount: 1000
+        currency: "usd"
+        status: "requires_payment_method"
+    
+    - name: "Get payment status"
+      method: GET
+      path: /v1/payment-intents/pi_test123
+      expected_status: 200
+      expected_body:
+        id: "string"
+        status: "string"
+        amount: "number"
+    
+    - name: "Invalid payment amount"
+      method: POST
+      path: /v1/payment-intents
+      body:
+        amount: -100
+        currency: "usd"
+      expected_status: 400
+      expected_body:
+        error:
+          type: "invalid_request_error"
+          message: "string"
+```
+
+## Tips and best practices
+
+<Tip>
+Use environment variables for sensitive data like API tokens. Never commit credentials to version control.
+</Tip>
+
+<Tip>
+Set up scheduled contract validation (daily or weekly) to catch API drift early.
+</Tip>
+
+<Tip>
+Ignore timestamp and UUID fields that change on every request using `ignore_fields`.
+</Tip>
+
+<Warning>
+Contract validation requires network access to real APIs. Ensure your CI environment can reach production endpoints.
+</Warning>
+
+<Note>
+If the mock API isn't running, Apicentric will automatically start it during validation.
+</Note>
+
+## Next steps
+
+- Set up [API simulator](/features/api-simulator) services to test against
+- Generate [code from validated contracts](/features/code-generation)
+- Use the [TUI](/features/tui) to monitor validation results
+- Export contracts to [OpenAPI format](/features/code-generation#export-formats)

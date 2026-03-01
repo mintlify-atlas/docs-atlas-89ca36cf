@@ -1,0 +1,200 @@
+---
+title: Plugin system
+description: Extend Apicentric with custom plugins to intercept and modify HTTP requests and responses
+---
+
+The plugin system allows you to extend Apicentric's functionality by writing custom code that intercepts HTTP requests and responses. Plugins are dynamically loaded at runtime and can modify requests before they're processed and responses before they're sent.
+
+<Warning>
+The plugin system is experimental and currently **not supported on Windows**. Plugin loading uses dynamic libraries that are platform-specific.
+</Warning>
+
+## How plugins work
+
+Plugins are dynamic libraries (`.so` on Linux, `.dylib` on macOS) that implement the `Plugin` trait. The plugin manager loads these libraries at runtime and executes their hooks during the request/response lifecycle.
+
+Each plugin can implement two hooks:
+- `on_request` - Called before a request is processed
+- `on_response` - Called after a response is generated
+
+## Creating a plugin
+
+<Steps>
+
+### Create a new Rust library
+
+Create a new Rust project with a `cdylib` crate type:
+
+```toml Cargo.toml
+[package]
+name = "logger_plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+async-trait = "0.1"
+log = "0.4"
+http = "1"
+apicentric = { path = "path/to/apicentric" }
+```
+
+### Implement the Plugin trait
+
+Implement the `Plugin` trait from `apicentric::domain::ports::plugin`:
+
+```rust src/lib.rs
+use async_trait::async_trait;
+use http::{Request, Response};
+use log::info;
+use apicentric::domain::ports::plugin::Plugin;
+
+struct LoggerPlugin;
+
+#[async_trait]
+impl Plugin for LoggerPlugin {
+    async fn on_request(&self, request: &mut Request<Vec<u8>>) {
+        info!("-> {} {}", request.method(), request.uri());
+    }
+
+    async fn on_response(&self, response: &mut Response<Vec<u8>>) {
+        info!("<- {}", response.status());
+    }
+}
+
+#[no_mangle]
+#[allow(improper_ctypes_definitions)]
+pub extern "C" fn create_plugin() -> Box<dyn Plugin> {
+    Box::new(LoggerPlugin)
+}
+```
+
+### Export the create_plugin symbol
+
+Your plugin **must** export a `create_plugin` function with the C ABI. This function returns a boxed instance of your plugin.
+
+</Steps>
+
+## Building your plugin
+
+Build the plugin as a dynamic library:
+
+```bash
+cargo build --release
+```
+
+The compiled library will be in `target/release/` with a platform-specific name:
+- Linux: `liblibname.so`
+- macOS: `liblibname.dylib`
+
+## Loading plugins
+
+Plugins are loaded from a directory using the `PluginManager`:
+
+```rust
+use apicentric::app::PluginManager;
+
+let manager = PluginManager::load_from_directory("/path/to/plugins")
+    .expect("Failed to load plugins");
+
+println!("Loaded {} plugins", manager.plugin_count());
+```
+
+The plugin manager will:
+1. Scan the directory for dynamic libraries
+2. Load each library and look for the `create_plugin` symbol
+3. Call `create_plugin()` to instantiate the plugin
+4. Register the plugin for request/response hooks
+
+## Using plugins
+
+Once loaded, plugins automatically intercept all HTTP traffic:
+
+```rust
+use http::{Request, Response};
+
+// Execute on_request hooks
+let mut request = Request::new(Vec::new());
+manager.on_request(&mut request).await;
+
+// Execute on_response hooks
+let mut response = Response::new(Vec::new());
+manager.on_response(&mut response).await;
+```
+
+## Plugin capabilities
+
+Plugins can modify requests and responses in various ways:
+
+<CodeGroup>
+
+```rust Add headers
+async fn on_request(&self, request: &mut Request<Vec<u8>>) {
+    request.headers_mut()
+        .insert("x-plugin", "enabled".parse().unwrap());
+}
+```
+
+```rust Modify response body
+async fn on_response(&self, response: &mut Response<Vec<u8>>) {
+    *response.body_mut() = b"Modified by plugin".to_vec();
+}
+```
+
+```rust Change status code
+async fn on_response(&self, response: &mut Response<Vec<u8>>) {
+    *response.status_mut() = http::StatusCode::OK;
+}
+```
+
+</CodeGroup>
+
+## Error handling
+
+The plugin manager provides detailed error messages:
+
+<CodeGroup>
+
+```rust Missing plugin symbol
+Failed to load one or more plugins:
+  - Plugin library 'plugin.so' is missing the required `create_plugin` symbol
+```
+
+```rust Invalid library
+Failed to load one or more plugins:
+  - Failed to open plugin library 'plugin.so': invalid ELF header
+```
+
+</CodeGroup>
+
+<Info>
+Ensure each plugin exports a `create_plugin` symbol and is built for the current platform. Mixed architectures (e.g., x86_64 plugin on ARM) will fail to load.
+</Info>
+
+## Best practices
+
+- **Keep plugins lightweight** - Plugins are called for every request/response
+- **Handle errors gracefully** - Don't panic in plugin code
+- **Use structured logging** - The example uses the `log` crate for debugging
+- **Test thoroughly** - Plugin bugs can affect all traffic
+- **Version compatibility** - Rebuild plugins when upgrading Apicentric
+
+## Example use cases
+
+- **Authentication** - Validate tokens and add user context to requests
+- **Rate limiting** - Track request counts and reject excessive traffic
+- **Logging** - Record detailed request/response information
+- **Transformation** - Convert between data formats
+- **Caching** - Store and retrieve responses based on request patterns
+- **Monitoring** - Collect metrics and send to observability platforms
+
+## Limitations
+
+<Warning>
+- Windows is not currently supported
+- Plugins must be compiled for the same platform and architecture as Apicentric
+- Plugin API may change between versions (experimental feature)
+- No hot-reloading - restart required to load new plugins
+</Warning>

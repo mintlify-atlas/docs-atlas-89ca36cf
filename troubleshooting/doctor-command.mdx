@@ -1,0 +1,210 @@
+---
+title: Doctor command
+description: Use the doctor command to diagnose issues with your Apicentric installation and environment
+---
+
+The `doctor` command is a built-in diagnostic tool that checks your Apicentric installation and environment for potential issues.
+
+## Overview
+
+The doctor command performs automated checks on your system to ensure everything is configured correctly. It helps you quickly identify and resolve common problems.
+
+```bash
+apicentric doctor
+```
+
+## What it checks
+
+The doctor command runs the following checks:
+
+### Apicentric version
+
+Verifies that Apicentric is properly installed and displays the current version.
+
+```
+Checking apicentric version... ✅ v0.1.0
+```
+
+<Info>
+  This check always passes if you can run the doctor command, as it confirms the CLI is working.
+</Info>
+
+### Rust installation
+
+Checks if Rust and Cargo are installed on your system. This is useful if you plan to build Apicentric from source or install plugins.
+
+```
+Checking Rust installation... ✅ cargo 1.75.0
+```
+
+<Note>
+  If Cargo is not found, you'll see a ❌ error. However, this only affects building from source—prebuilt binaries work without Rust.
+</Note>
+
+### Docker installation
+
+Verifies that Docker is installed and available. Docker is required for the `dockerize` command.
+
+```
+Checking Docker installation... ✅ Docker version 24.0.0
+```
+
+<Warning>
+  If Docker is not found, you'll see a ⚠️ warning. The dockerize command will not work without Docker, but other Apicentric features remain functional.
+</Warning>
+
+### Services directory
+
+Checks if a `./services` directory exists in your current working directory. This is where Apicentric looks for service definition files by default.
+
+```
+Checking services directory... ✅ Found ./services
+```
+
+If the directory doesn't exist:
+
+```
+Checking services directory... ℹ️ ./services not found (will be created on first use)
+```
+
+<Tip>
+  You don't need a services directory to run Apicentric. You can specify service files directly with the `--file` flag.
+</Tip>
+
+### Configuration file
+
+Checks for an `apicentric.json` configuration file in the current directory.
+
+```
+Checking configuration... ✅ Found apicentric.json
+```
+
+If no configuration file exists:
+
+```
+Checking configuration... ℹ️ apicentric.json not found (using defaults)
+```
+
+<Info>
+  Apicentric works perfectly fine with default settings. A configuration file is only needed for custom settings.
+</Info>
+
+## Understanding the output
+
+After running all checks, the doctor command displays a summary:
+
+### All checks passed
+
+```
+✨ All systems operational! (5 checks passed) You are ready to build.
+```
+
+This means your environment is fully configured and ready to use all Apicentric features.
+
+### Some checks failed
+
+```
+⚠️  Some issues were found (4 checks passed, 1 failed). Please review the errors above.
+```
+
+Review the individual check results above the summary to see which checks failed and follow the suggested solutions.
+
+## Common issues and solutions
+
+### Cargo not found
+
+**Issue:** ❌ Cargo not found
+
+**Impact:** You cannot build Apicentric from source or install Cargo-based plugins.
+
+**Solution:** Install Rust and Cargo:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+After installation, restart your terminal and run `apicentric doctor` again.
+
+### Docker not found
+
+**Issue:** ⚠️ Docker not found
+
+**Impact:** The `dockerize` command will not work.
+
+**Solution:** Install Docker from [docker.com](https://www.docker.com/get-started)
+
+After installation, verify with:
+
+```bash
+docker --version
+```
+
+### No services directory
+
+**Issue:** ℹ️ ./services not found
+
+**Impact:** None—this is informational only.
+
+**Solution:** Create a services directory if you want to organize your service definitions:
+
+```bash
+mkdir services
+```
+
+Or specify service files directly:
+
+```bash
+apicentric simulator start --file my-service.yaml
+```
+
+### No configuration file
+
+**Issue:** ℹ️ apicentric.json not found
+
+**Impact:** None—default settings will be used.
+
+**Solution:** Create a configuration file only if you need custom settings:
+
+```json
+{
+  "default_port": 9000,
+  "log_level": "info"
+}
+```
+
+## When to run doctor
+
+Run the doctor command:
+
+- After installing Apicentric for the first time
+- When troubleshooting installation or runtime issues
+- Before filing a bug report (include the output)
+- After system updates that might affect dependencies
+- When switching between different installation methods
+
+## Example output
+
+Here's an example of a complete doctor command output:
+
+```bash
+$ apicentric doctor
+🏥 Apicentric Doctor
+Checking your system for potential issues...
+
+Checking apicentric version... ✅ v0.1.0
+Checking Rust installation... ✅ cargo 1.75.0 (1d8b05cdd 2024-01-01)
+Checking Docker installation... ✅ Docker version 24.0.0, build 1331b8c
+Checking services directory... ✅ Found ./services
+Checking configuration... ℹ️ apicentric.json not found (using defaults)
+
+✨ All systems operational! (5 checks passed) You are ready to build.
+```
+
+## Next steps
+
+If the doctor command reveals issues:
+
+1. Follow the suggestions provided in the output
+2. Check the [common issues guide](/troubleshooting/common-issues) for detailed solutions
+3. Review the [installation guide](/installation) if reinstalling is needed
+4. Visit the [GitHub issues](https://github.com/pmaojo/apicentric/issues) if problems persist

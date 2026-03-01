@@ -1,0 +1,300 @@
+---
+title: Installation
+description: Install Apicentric via npm, Homebrew, install script, Cargo, or Docker
+---
+
+Apicentric provides multiple installation methods to suit your workflow. Choose the one that works best for you.
+
+## npm (recommended for quick start)
+
+If you have Node.js installed, this is the fastest way to get started.
+
+<CodeGroup>
+```bash npx (no install)
+npx apicentric simulator start
+```
+
+```bash npm
+npm install -g apicentric
+```
+
+```bash yarn
+yarn global add apicentric
+```
+
+```bash pnpm
+pnpm add -g apicentric
+```
+</CodeGroup>
+
+<Info>
+The npm package wraps the native binary and downloads it on first use.
+</Info>
+
+### Verify installation
+
+```bash
+apicentric --version
+```
+
+## Homebrew (recommended for macOS/Linux)
+
+The easiest way to install on macOS and Linux:
+
+```bash
+brew install pmaojo/tap/apicentric
+```
+
+### Update to latest version
+
+```bash
+brew upgrade apicentric
+```
+
+### Verify installation
+
+```bash
+apicentric --version
+```
+
+<Tip>
+Homebrew installations include all features (TUI, contract testing, MCP, IoT).
+</Tip>
+
+## Install script (Unix)
+
+Quick installation script for Linux and macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+```
+
+This script will:
+- Detect your platform and architecture automatically
+- Download the appropriate binary
+- Verify checksums for security
+- Install to `/usr/local/bin` (requires sudo)
+
+### Custom installation directory
+
+Install to a directory that doesn't require sudo:
+
+```bash
+INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.sh | sh
+```
+
+Then add to PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Verify installation
+
+```bash
+apicentric --version
+```
+
+## Windows PowerShell
+
+For Windows users, use the PowerShell installation script:
+
+```powershell
+irm https://raw.githubusercontent.com/pmaojo/apicentric/main/scripts/install.ps1 | iex
+```
+
+This script will:
+- Download the Windows x64 binary
+- Verify checksums
+- Extract to `%USERPROFILE%\.apicentric\bin`
+- Add to PATH (restart terminal after installation)
+
+### Verify installation
+
+```powershell
+apicentric --version
+```
+
+<Warning>
+After installation, restart your terminal or PowerShell session to refresh the PATH.
+</Warning>
+
+## Cargo (build from source)
+
+If you have Rust installed, you can build from source with custom features:
+
+### Minimal build (fastest, ~1 minute)
+
+```bash
+cargo install apicentric --no-default-features --features minimal
+```
+
+Includes: Core simulator only
+
+### CLI tools build (recommended, ~2 minutes)
+
+```bash
+cargo install apicentric --features cli-tools
+```
+
+Includes: Simulator, contract testing, and TUI
+
+### Full build (all features, ~3-5 minutes)
+
+```bash
+cargo install apicentric --features full
+```
+
+Includes: All features (TUI, MCP, GraphQL, scripting, AI, IoT, GUI)
+
+### Default build
+
+```bash
+cargo install apicentric
+```
+
+Includes: Simulator, contract testing, TUI, WebUI, GraphQL, IoT
+
+### Verify installation
+
+```bash
+apicentric --version
+```
+
+<Info>
+Building from source requires Rust 1.70 or later. Install Rust from [rustup.rs](https://rustup.rs).
+</Info>
+
+## Pre-built binaries
+
+Download pre-built binaries for your platform from [GitHub Releases](https://github.com/pmaojo/apicentric/releases).
+
+### Available platforms
+
+- Linux x64 (`apicentric-linux-x64.tar.gz`)
+- macOS x64 (`apicentric-macos-x64.tar.gz`)
+- macOS ARM64 (`apicentric-macos-arm64.tar.gz`)
+- Windows x64 (`apicentric-windows-x64.zip`)
+
+### Manual installation (Linux/macOS)
+
+<Steps>
+  <Step title="Download the binary">
+    ```bash
+    curl -LO https://github.com/pmaojo/apicentric/releases/latest/download/apicentric-linux-x64.tar.gz
+    ```
+  </Step>
+  
+  <Step title="Verify checksum (optional)">
+    ```bash
+    curl -LO https://github.com/pmaojo/apicentric/releases/latest/download/checksums.txt
+    sha256sum -c checksums.txt --ignore-missing
+    ```
+  </Step>
+  
+  <Step title="Extract">
+    ```bash
+    tar -xzf apicentric-linux-x64.tar.gz
+    ```
+  </Step>
+  
+  <Step title="Move to PATH">
+    ```bash
+    sudo mv apicentric /usr/local/bin/
+    sudo chmod +x /usr/local/bin/apicentric
+    ```
+  </Step>
+</Steps>
+
+### Manual installation (Windows)
+
+<Steps>
+  <Step title="Download">
+    Download `apicentric-windows-x64.zip` from releases
+  </Step>
+  
+  <Step title="Extract">
+    Extract the archive to a directory
+  </Step>
+  
+  <Step title="Add to PATH">
+    Move `apicentric.exe` to a directory in your PATH, or add the directory to your PATH environment variable
+  </Step>
+</Steps>
+
+## Docker
+
+You can use the `dockerize` command to create a self-contained Docker image for your services.
+
+```bash
+apicentric simulator dockerize --file <service1>.yaml [<service2>.yaml ...] --output ./my-service-docker
+```
+
+This generates a `Dockerfile` and `.dockerignore` in the output directory.
+
+Build and run:
+
+```bash
+cd my-service-docker
+docker build -t my-service .
+docker run -p <port>:<port> my-service
+```
+
+<Info>
+See the [Docker deployment guide](/examples/docker-deployment) for production deployment patterns.
+</Info>
+
+## Verification
+
+After installation, verify that Apicentric is working correctly:
+
+```bash
+# Check version
+apicentric --version
+
+# View help
+apicentric --help
+
+# List available commands
+apicentric simulator --help
+```
+
+Expected output should show version information and available commands.
+
+## Feature flags
+
+Different installation methods include different feature sets:
+
+| Feature | npm | Homebrew | Install Script | Cargo (default) | Cargo (full) |
+|---------|-----|----------|----------------|-----------------|---------------|
+| Simulator | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Contract Testing | ✅ | ✅ | ✅ | ✅ | ✅ |
+| TUI | ✅ | ✅ | ✅ | ✅ | ✅ |
+| WebUI | ✅ | ✅ | ✅ | ✅ | ✅ |
+| GraphQL | ✅ | ✅ | ✅ | ✅ | ✅ |
+| IoT Digital Twins | ✅ | ✅ | ✅ | ✅ | ✅ |
+| MCP | ❌ | ✅ | ✅ | ❌ | ✅ |
+| GUI | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Scripting | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+<Tip>
+For most users, the default feature set (npm, Homebrew, or install script) is sufficient.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Create your first mock API
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/cli/overview">
+    Explore all commands
+  </Card>
+  <Card title="Run diagnostics" icon="stethoscope" href="/troubleshooting/doctor-command">
+    Use the doctor command to check your setup
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting/common-issues">
+    Fix common installation issues
+  </Card>
+</CardGroup>

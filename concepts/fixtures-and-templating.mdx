@@ -1,0 +1,653 @@
+---
+title: Fixtures and templating
+description: Create dynamic, realistic API responses with fixtures and Handlebars templating
+---
+
+Fixtures and templating are the foundation of dynamic responses in Apicentric. Fixtures provide reusable test data, while Handlebars templating allows you to generate realistic, context-aware responses.
+
+## What are fixtures?
+
+Fixtures are predefined data objects stored in your service definition. They act as an in-memory database for your mock API, providing consistent test data across all endpoints.
+
+### Defining fixtures
+
+Fixtures are defined in the `fixtures` section of your service definition:
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      email: "alice@example.com"
+      role: "admin"
+    - id: 2
+      username: "bob"
+      email: "bob@example.com"
+      role: "user"
+  
+  products:
+    - id: 101
+      name: "Laptop Pro"
+      price: 1299.99
+      category: "electronics"
+      stock: 15
+    - id: 102
+      name: "Coffee Mug"
+      price: 12.50
+      category: "home"
+      stock: 50
+```
+
+<Info>
+Fixtures can contain any valid JSON data structure: objects, arrays, strings, numbers, booleans, and nested structures.
+</Info>
+
+### Fixture structure
+
+You can organize fixtures in several ways:
+
+<CodeGroup>
+
+```yaml Arrays of objects
+fixtures:
+  tasks:
+    - id: 1
+      title: "Setup environment"
+      completed: false
+    - id: 2
+      title: "Write tests"
+      completed: true
+```
+
+```yaml Single objects
+fixtures:
+  config:
+    api_version: "2.1"
+    max_items: 100
+    features:
+      - "auth"
+      - "logging"
+```
+
+```yaml Nested structures
+fixtures:
+  organization:
+    name: "Acme Corp"
+    departments:
+      - name: "Engineering"
+        employees: 50
+      - name: "Sales"
+        employees: 30
+```
+
+</CodeGroup>
+
+## Handlebars templating
+
+Apicentric uses Handlebars as its template engine. Templates allow you to create dynamic responses that reference fixtures, request data, and runtime state.
+
+### Basic syntax
+
+Handlebars expressions are wrapped in double curly braces:
+
+```yaml
+responses:
+  200:
+    content_type: application/json
+    body: |
+      {
+        "id": {{params.id}},
+        "username": "{{request.body.username}}",
+        "email": "{{request.body.email}}",
+        "created_at": "{{now}}"
+      }
+```
+
+### Template context
+
+Your templates have access to several context objects:
+
+<Accordion title="Available template context">
+
+#### fixtures
+
+Access fixture data defined in your service:
+
+```handlebars
+{{fixtures.users}}
+{{fixtures.products.0.name}}
+```
+
+#### params
+
+Path parameters from the URL:
+
+```handlebars
+{{params.id}}
+{{params.userId}}
+{{params.orderId}}
+```
+
+For the path `/users/{id}`, a request to `/users/123` provides `{{params.id}}` = `"123"`.
+
+#### request.query
+
+Query string parameters:
+
+```handlebars
+{{request.query.category}}
+{{request.query.page}}
+{{request.query.limit}}
+```
+
+For the URL `/products?category=electronics&page=2`, you get:
+- `{{request.query.category}}` = `"electronics"`
+- `{{request.query.page}}` = `"2"`
+
+#### request.headers
+
+HTTP request headers:
+
+```handlebars
+{{request.headers.authorization}}
+{{request.headers.x-request-id}}
+{{request.headers.user-agent}}
+```
+
+#### request.body
+
+Parsed request body (for POST/PUT/PATCH):
+
+```handlebars
+{{request.body.username}}
+{{request.body.email}}
+{{request.body.items.0.quantity}}
+```
+
+#### request.method and request.path
+
+HTTP method and request path:
+
+```handlebars
+{{request.method}}  // "GET", "POST", etc.
+{{request.path}}    // "/api/v1/users"
+```
+
+#### runtime
+
+Runtime state data (mutable across requests):
+
+```handlebars
+{{runtime.counter}}
+{{runtime.lastUpdated}}
+```
+
+#### bucket
+
+Persistent storage bucket:
+
+```handlebars
+{{bucket.lastCreated}}
+{{bucket.sessionData}}
+```
+
+#### env
+
+Environment variables:
+
+```handlebars
+{{env.API_KEY}}
+{{env.DATABASE_URL}}
+```
+
+</Accordion>
+
+## Built-in helpers
+
+Apicentric provides many Handlebars helpers for common operations.
+
+### Iteration helpers
+
+#### each
+
+Iterate over arrays:
+
+```yaml
+body: |
+  {
+    "users": [
+      {{#each fixtures.users}}
+      {
+        "id": {{id}},
+        "username": "{{username}}",
+        "email": "{{email}}"
+      }{{#unless @last}},{{/unless}}
+      {{/each}}
+    ]
+  }
+```
+
+<Note>
+Use `{{#unless @last}},{{/unless}}` to add commas between items but not after the last one.
+</Note>
+
+Special variables in `each` loops:
+- `@index` - Current iteration index (0-based)
+- `@first` - True for the first item
+- `@last` - True for the last item
+- `@key` - Key name when iterating over objects
+
+### Conditional helpers
+
+#### if/else
+
+Conditional rendering:
+
+```yaml
+body: |
+  {
+    "status": "{{#if request.query.active}}active{{else}}inactive{{/if}}",
+    "message": "{{#if params.id}}Found{{else}}Not found{{/if}}"
+  }
+```
+
+#### Comparison helpers
+
+Compare values:
+
+```yaml
+# Equal
+{{#if (eq params.id "1")}}Match{{/if}}
+
+# Not equal
+{{#if (ne params.status "pending")}}Complete{{/if}}
+
+# Greater than
+{{#if (gt params.id "100")}}Large ID{{/if}}
+
+# Less than
+{{#if (lt params.price "50")}}Cheap{{/if}}
+
+# Greater than or equal
+{{#if (gte params.age "18")}}Adult{{/if}}
+
+# Less than or equal
+{{#if (lte params.score "100")}}Valid{{/if}}
+```
+
+#### Logical helpers
+
+Combine conditions:
+
+```yaml
+# AND
+{{#if (and request.body.username request.body.email)}}
+  Valid input
+{{/if}}
+
+# OR
+{{#if (or (eq params.role "admin") (eq params.role "moderator"))}}
+  Has permissions
+{{/if}}
+
+# NOT
+{{#if (not request.body.optional)}}
+  Field is empty
+{{/if}}
+```
+
+### Data manipulation helpers
+
+#### json
+
+Serialize values to JSON:
+
+```yaml
+body: |
+  {
+    "items": {{json request.body.items}},
+    "metadata": {{json fixtures.config}}
+  }
+```
+
+#### find
+
+Find an item in an array:
+
+```yaml
+{{find fixtures.users "id" params.id}}
+```
+
+#### filter
+
+Filter array items:
+
+```yaml
+{{filter fixtures.products "category" request.query.category}}
+```
+
+#### default
+
+Provide a default value:
+
+```yaml
+"page": {{default request.query.page "1"}}
+```
+
+### Faker helpers
+
+Generate realistic random data:
+
+```yaml
+body: |
+  {
+    "id": {{faker "datatype.number" min=1000 max=9999}},
+    "name": "{{faker "name.fullName"}}",
+    "email": "{{faker "internet.email"}}",
+    "phone": "{{faker "phone.number"}}",
+    "address": {
+      "street": "{{faker "address.streetAddress"}}",
+      "city": "{{faker "address.city"}}",
+      "zipCode": "{{faker "address.zipCode"}}"
+    },
+    "price": {{faker "commerce.price" min=10 max=1000}},
+    "product": "{{faker "commerce.productName"}}",
+    "company": "{{faker "company.name"}}",
+    "description": "{{faker "lorem.paragraph"}}",
+    "uuid": "{{faker "datatype.uuid"}}"
+  }
+```
+
+<Accordion title="Common Faker methods">
+
+**Person data:**
+- `name.fullName` - Full name
+- `name.firstName` - First name
+- `name.lastName` - Last name
+
+**Internet:**
+- `internet.email` - Email address
+- `internet.url` - URL
+- `internet.userName` - Username
+- `internet.password` - Password
+
+**Commerce:**
+- `commerce.productName` - Product name
+- `commerce.price` - Price (with min/max)
+- `commerce.department` - Department
+- `commerce.color` - Color name
+
+**Company:**
+- `company.name` - Company name
+- `company.catchPhrase` - Company slogan
+
+**Address:**
+- `address.streetAddress` - Street address
+- `address.city` - City name
+- `address.state` - State name
+- `address.zipCode` - ZIP code
+- `address.country` - Country name
+
+**Lorem:**
+- `lorem.word` - Random word
+- `lorem.sentence` - Random sentence
+- `lorem.paragraph` - Random paragraph
+
+**Data types:**
+- `datatype.number` - Random number (with min/max)
+- `datatype.uuid` - UUID v4
+- `datatype.boolean` - Random boolean
+
+**Phone:**
+- `phone.number` - Phone number
+
+</Accordion>
+
+### Date/time helpers
+
+#### now
+
+Current ISO timestamp:
+
+```yaml
+"created_at": "{{now}}"
+```
+
+Output: `"2024-01-15T10:30:00Z"`
+
+### Math helpers
+
+Perform calculations:
+
+```yaml
+# Addition
+"total": {{add 10 5}}  // 15
+
+# Subtraction
+"remaining": {{subtract 100 25}}  // 75
+
+# Multiplication
+"price": {{multiply 10 1.5}}  // 15
+
+# Division
+"average": {{divide 100 4}}  // 25
+```
+
+### Text helpers
+
+Manipulate strings:
+
+```yaml
+# Uppercase
+"code": "{{uppercase request.body.code}}"
+
+# Lowercase
+"email": "{{lowercase request.body.email}}"
+
+# Capitalize
+"name": "{{capitalize request.body.name}}"
+```
+
+### Random helper
+
+Pick a random value from a list:
+
+```yaml
+"status": "{{#random}}pending,processing,shipped,delivered{{/random}}"
+```
+
+## Real-world examples
+
+### User list with pagination
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      email: "alice@example.com"
+    - id: 2
+      username: "bob"
+      email: "bob@example.com"
+    - id: 3
+      username: "charlie"
+      email: "charlie@example.com"
+
+endpoints:
+  - method: GET
+    path: /users
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "users": [
+              {{#each fixtures.users}}
+              {
+                "id": {{id}},
+                "username": "{{username}}",
+                "email": "{{email}}"
+              }{{#unless @last}},{{/unless}}
+              {{/each}}
+            ],
+            "page": {{default request.query.page "1"}},
+            "total": {{fixtures.users.length}}
+          }
+```
+
+### Product search with filtering
+
+```yaml
+fixtures:
+  products:
+    - id: 101
+      name: "Laptop Pro"
+      category: "electronics"
+      price: 1299.99
+    - id: 102
+      name: "Coffee Mug"
+      category: "home"
+      price: 12.50
+
+endpoints:
+  - method: GET
+    path: /products
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "products": {{json (filter fixtures.products "category" request.query.category)}},
+            "filter": "{{request.query.category}}",
+            "total": {{fixtures.products.length}}
+          }
+```
+
+### Order creation with dynamic data
+
+```yaml
+endpoints:
+  - method: POST
+    path: /orders
+    responses:
+      201:
+        content_type: application/json
+        body: |
+          {
+            "order_id": {{faker "datatype.number" min=1000 max=9999}},
+            "customer_id": {{request.body.customer_id}},
+            "items": {{json request.body.items}},
+            "total": {{faker "commerce.price" min=10 max=500}},
+            "status": "pending",
+            "created_at": "{{now}}",
+            "tracking_number": "{{faker "datatype.uuid"}}"
+          }
+```
+
+### Conditional response based on user role
+
+```yaml
+fixtures:
+  users:
+    - id: 1
+      username: "alice"
+      role: "admin"
+    - id: 2
+      username: "bob"
+      role: "user"
+
+endpoints:
+  - method: GET
+    path: /users/{id}
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {{#with (find fixtures.users "id" params.id)}}
+          {
+            "id": {{id}},
+            "username": "{{username}}",
+            "role": "{{role}}",
+            {{#if (eq role "admin")}}
+            "permissions": ["read", "write", "delete"],
+            {{else}}
+            "permissions": ["read"],
+            {{/if}}
+            "is_admin": {{eq role "admin"}}
+          }
+          {{/with}}
+```
+
+## Bucket for persistent state
+
+The bucket is a special storage area for data that persists across requests and can be modified by side effects.
+
+### Defining bucket data
+
+```yaml
+bucket:
+  counter: 0
+  lastUser: null
+  sessionData: {}
+```
+
+### Using bucket in templates
+
+```yaml
+body: |
+  {
+    "counter": {{bucket.counter}},
+    "lastUser": "{{bucket.lastUser}}"
+  }
+```
+
+### Modifying bucket with side effects
+
+```yaml
+responses:
+  201:
+    content_type: application/json
+    body: |
+      {"created": true}
+    side_effects:
+      - action: "set"
+        target: "bucket.counter"
+        value: "{{add bucket.counter 1}}"
+      - action: "set"
+        target: "bucket.lastUser"
+        value: "{{request.body.username}}"
+```
+
+## Best practices
+
+<Tip>
+**Template best practices:**
+
+1. **Keep templates readable**: Use proper indentation and formatting
+2. **Use comments**: Document complex template logic with YAML comments
+3. **Test edge cases**: Verify templates work with missing/null values
+4. **Use helpers**: Leverage built-in helpers instead of complex logic
+5. **Validate JSON**: Ensure your templates produce valid JSON
+6. **Escape strings**: Use quotes around string values in JSON
+</Tip>
+
+<Warning>
+**Common pitfalls:**
+
+- **Missing commas in JSON**: Use `{{#unless @last}},{{/unless}}` in loops
+- **Unescaped quotes**: Be careful with quotes in string values
+- **Type mismatches**: Numbers should not be quoted in JSON
+- **Null/undefined values**: Provide defaults for optional fields
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Scenarios" icon="flask" href="/concepts/scenarios">
+    Learn how to simulate different API states
+  </Card>
+  
+  <Card title="Service definitions" icon="file-code" href="/concepts/service-definitions">
+    Master the complete YAML structure
+  </Card>
+</CardGroup>

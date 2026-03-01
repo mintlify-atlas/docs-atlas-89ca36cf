@@ -1,0 +1,285 @@
+---
+title: simulator import
+description: Import and convert API definitions from external formats into Apicentric service definitions
+---
+
+Convert API specifications from popular formats (OpenAPI, Postman, WireMock, Mockoon) into Apicentric service definition YAML files.
+
+## Usage
+
+```bash
+apicentric simulator import --file <INPUT> --output <OUTPUT>
+```
+
+## Arguments
+
+<ParamField path="--file" type="string" required>
+  Path to the input file to import. Supports OpenAPI (JSON/YAML), Postman collections, WireMock mappings, and Mockoon environments.
+</ParamField>
+
+<ParamField path="--output" type="string" required>
+  Path where the converted Apicentric service definition will be written. The output is always in YAML format.
+</ParamField>
+
+## Options
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be imported without actually creating the output file (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Supported formats
+
+The import command automatically detects the input format:
+
+### OpenAPI / Swagger
+
+- OpenAPI 3.x (JSON or YAML)
+- Swagger 2.0 (JSON or YAML)
+- Auto-detected by presence of `openapi` or `swagger` field
+
+### Postman Collections
+
+- Postman Collection v2.x (JSON)
+- Auto-detected by presence of `info._postman_id` field
+
+### WireMock
+
+- WireMock JSON mappings
+- Single mapping or array of mappings
+- Auto-detected by `request` and `response` fields
+
+### Mockoon
+
+- Mockoon environment files (JSON)
+- Auto-detected by `source`, `routes`, and `id` fields
+
+## Examples
+
+### Import OpenAPI specification
+
+```bash
+apicentric simulator import --file openapi.yaml --output services/api.yaml
+```
+
+**Example output:**
+
+```
+Detected OpenAPI format.
+✅ Imported OpenAPI file to services/api.yaml
+```
+
+### Import Postman collection
+
+```bash
+apicentric simulator import --file collection.json --output services/users.yaml
+```
+
+**Example output:**
+
+```
+Detected Postman collection format.
+✅ Imported Postman file to services/users.yaml
+```
+
+### Import WireMock mapping
+
+```bash
+apicentric simulator import --file wiremock-mappings.json --output services/mock.yaml
+```
+
+**Example output:**
+
+```
+Detected WireMock mapping format.
+✅ Imported WireMock file to services/mock.yaml
+```
+
+### Import Mockoon environment
+
+```bash
+apicentric simulator import --file mockoon-env.json --output services/mockoon.yaml
+```
+
+**Example output:**
+
+```
+Detected Mockoon environment format.
+✅ Imported Mockoon file to services/mockoon.yaml
+```
+
+### Auto-detection fallback
+
+If the format cannot be determined:
+
+```bash
+apicentric simulator import --file unknown.yaml --output services/test.yaml
+```
+
+**Example output:**
+
+```
+Could not detect specific JSON format, attempting to parse as OpenAPI (YAML/JSON)...
+✅ Imported OpenAPI file to services/test.yaml
+```
+
+### Dry run mode
+
+```bash
+apicentric simulator import --file openapi.yaml --output services/api.yaml --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would auto-detect and import 'openapi.yaml' into service 'services/api.yaml'
+```
+
+## How it works
+
+The import process:
+
+1. **Read the input file** - Loads the content from the specified path
+2. **Auto-detect format** - Analyzes the structure to identify the format
+3. **Convert to Apicentric format** - Transforms the specification into a service definition
+4. **Write output** - Saves the converted YAML to the output path
+
+<Info>
+The converted service definition can be immediately used with `simulator start` or further customized for your needs.
+</Info>
+
+## Use cases
+
+### Migrate from OpenAPI
+
+```bash
+# Convert existing OpenAPI spec
+apicentric simulator import --file api-spec.yaml --output services/api.yaml
+
+# Start simulator with converted service
+apicentric simulator start --services-dir services
+```
+
+### Import Postman collections for testing
+
+```bash
+# Export collection from Postman, then import
+apicentric simulator import --file postman-collection.json --output services/test-api.yaml
+```
+
+### Migrate from other mock tools
+
+```bash
+# From WireMock
+apicentric simulator import --file wiremock.json --output services/legacy-api.yaml
+
+# From Mockoon
+apicentric simulator import --file mockoon.json --output services/mockoon-api.yaml
+```
+
+### Batch conversion
+
+```bash
+#!/bin/bash
+for file in specs/*.yaml; do
+  name=$(basename "$file" .yaml)
+  apicentric simulator import --file "$file" --output "services/${name}.yaml"
+done
+```
+
+## Conversion details
+
+### OpenAPI conversion
+
+- Paths → Endpoints
+- Operations → HTTP methods
+- Schemas → Type definitions
+- Responses → Response configurations
+- Security → Authentication settings
+
+### Postman conversion
+
+- Requests → Endpoints
+- Examples → Response scenarios
+- Variables → Service configuration
+- Pre-request scripts → Custom logic (where applicable)
+
+### WireMock conversion
+
+- Request matchers → Endpoint routes
+- Response templates → Response bodies
+- Stubs → Endpoint definitions
+- Scenarios → State-based responses
+
+### Mockoon conversion
+
+- Routes → Endpoints
+- Route responses → Response configurations
+- Environment settings → Server configuration
+- Data buckets → Reusable data definitions
+
+## Related commands
+
+- [`simulator export`](/cli/simulator/export) - Export service definitions to other formats
+- [`simulator validate`](/cli/simulator/validate) - Validate the imported service definition
+- [`simulator start`](/cli/simulator/start) - Start simulator with imported services
+
+<Warning>
+The import process does its best to convert all features, but some advanced or format-specific features may not translate perfectly. Always validate and test the imported service definition.
+</Warning>
+
+## Troubleshooting
+
+### Failed to read input file
+
+```
+❌ Failed to read input file: No such file or directory
+💡 Ensure the file is accessible and encoded as UTF-8
+```
+
+**Solution:** Check the file path and ensure it exists.
+
+### Invalid format
+
+```
+❌ Invalid YAML/JSON format: expected mapping at line 5
+💡 Ensure the file content is valid YAML or JSON
+```
+
+**Solution:** Validate your input file syntax using a YAML/JSON validator.
+
+### Missing OpenAPI version
+
+```
+❌ Could not detect OpenAPI version (missing 'openapi' or 'swagger' field)
+💡 Ensure the file is a valid OpenAPI 3.0 or Swagger 2.0 document
+```
+
+**Solution:** Add the required version field to your specification:
+
+```yaml
+openapi: 3.0.0
+```
+
+### Conversion failed
+
+```
+❌ OpenAPI/Swagger conversion failed: unsupported schema type
+```
+
+**Solution:** Check the conversion logs and simplify complex schemas if needed. Some advanced features may require manual adjustment after import.

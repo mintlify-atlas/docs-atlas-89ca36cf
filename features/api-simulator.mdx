@@ -1,0 +1,380 @@
+---
+title: API simulator
+description: Create and run mock APIs with simple YAML configuration
+---
+
+The API simulator is Apicentric's core feature that lets you define and serve mock APIs locally using YAML configuration files. It's perfect for frontend development, API design, testing, and prototyping.
+
+## What is the API simulator?
+
+The API simulator transforms YAML service definitions into fully functional HTTP servers. Each service definition specifies endpoints, responses, and behaviors, allowing you to mock complex API interactions without writing backend code.
+
+### Key capabilities
+
+- **Dynamic responses** with Handlebars templating
+- **Path parameters** and regex matching
+- **Request validation** and conditional responses
+- **Scenarios** for different API states (maintenance, high load, etc.)
+- **Request/response logging** for debugging
+- **Fixtures** for reusable test data
+- **Recording proxy** to capture real API traffic
+- **Hot reload** when service files change
+
+## Why use the API simulator?
+
+<CardGroup cols={2}>
+  <Card title="Frontend development" icon="code">
+    Build UI components without waiting for backend APIs. Mock realistic responses with dynamic data.
+  </Card>
+  <Card title="API design" icon="pen-ruler">
+    Prototype API contracts before implementation. Test different response structures and status codes.
+  </Card>
+  <Card title="Integration testing" icon="vial">
+    Create deterministic test environments. Simulate edge cases and error conditions.
+  </Card>
+  <Card title="Team collaboration" icon="users">
+    Share mock APIs using Docker images. Ensure consistent development environments across teams.
+  </Card>
+</CardGroup>
+
+## Getting started
+
+<Steps>
+  <Step title="Create a service definition">
+    Create a YAML file defining your mock API. Here's a simple example for a user service:
+
+    ```yaml user-api.yaml
+    name: User API
+    version: "1.0"
+    description: Mock user management API
+    server:
+      port: 9001
+      base_path: /api/v1
+
+    fixtures:
+      users:
+        - id: 1
+          name: "Alice Johnson"
+          email: "alice@example.com"
+        - id: 2
+          name: "Bob Smith"
+          email: "bob@example.com"
+
+    endpoints:
+      - method: GET
+        path: /users
+        responses:
+          200:
+            content_type: application/json
+            body: |
+              {
+                "users": [
+                  {{#each fixtures.users}}
+                  {
+                    "id": {{id}},
+                    "name": "{{name}}",
+                    "email": "{{email}}"
+                  }{{#unless @last}},{{/unless}}
+                  {{/each}}
+                ]
+              }
+
+      - method: GET
+        path: /users/{id}
+        responses:
+          200:
+            content_type: application/json
+            body: |
+              {
+                "id": {{params.id}},
+                "name": "{{faker \"name.firstName\"}} {{faker \"name.lastName\"}}",
+                "email": "{{faker \"internet.email\"}}",
+                "created_at": "{{now}}"
+              }
+    ```
+  </Step>
+
+  <Step title="Start the simulator">
+    Run the simulator pointing to your services directory:
+
+    ```bash
+    apicentric simulator start --services-dir .
+    ```
+
+    You'll see output like:
+
+    ```
+    🚀 Starting API Simulator...
+    📁 Services directory: .
+    ✅ API Simulator started (1 services, 1 active)
+       - User API: http://localhost:9001/api/v1
+    🔄 Simulator running... Press Ctrl+C to stop
+    ```
+  </Step>
+
+  <Step title="Test your API">
+    Make requests to your mock API:
+
+    ```bash
+    # Get all users
+    curl http://localhost:9001/api/v1/users
+
+    # Get specific user
+    curl http://localhost:9001/api/v1/users/123
+    ```
+
+    The simulator logs all requests in real-time, making debugging easy.
+  </Step>
+</Steps>
+
+## Advanced features
+
+### Dynamic templating
+
+Use Handlebars helpers to generate realistic data:
+
+```yaml
+responses:
+  200:
+    body: |
+      {
+        "order_id": {{faker "datatype.uuid"}},
+        "amount": {{faker "commerce.price"}},
+        "status": "{{#random}}pending,processing,completed{{/random}}",
+        "timestamp": "{{now}}"
+      }
+```
+
+### Request validation
+
+Conditionally return responses based on request data:
+
+```yaml
+endpoints:
+  - method: POST
+    path: /orders
+    responses:
+      201:
+        body: '{"success": true}'
+      422:
+        condition: "{{not request.body.customer_id}}"
+        body: '{"error": "customer_id is required"}'
+```
+
+### Scenarios
+
+Simulate different API states:
+
+```yaml
+scenarios:
+  - name: "high_load"
+    description: "Slow responses under load"
+    delay_ms: 2000
+    response_rate: 0.7
+
+  - name: "maintenance"
+    description: "Service unavailable"
+    response:
+      status: 503
+      body: '{"error": "Maintenance in progress"}'
+```
+
+Activate scenarios with:
+
+```bash
+apicentric simulator set-scenario --service user-api --scenario high_load
+```
+
+### Recording proxy
+
+Capture real API traffic and auto-generate mock endpoints:
+
+```yaml
+server:
+  port: 9001
+  record_unknown: true
+  proxy_target: https://api.real-service.com
+```
+
+Requests to undefined endpoints are proxied and recorded for later use.
+
+## Commands reference
+
+### Start simulator
+
+```bash
+apicentric simulator start [OPTIONS]
+```
+
+**Options:**
+- `--services-dir <DIR>` - Directory containing service YAML files (default: current directory)
+- `--force` - Force restart if already running
+- `--template <ID>` - Install a marketplace template before starting
+
+### Stop simulator
+
+```bash
+apicentric simulator stop [OPTIONS]
+```
+
+**Options:**
+- `--force` - Force stop even if services are active
+
+### Check status
+
+```bash
+apicentric simulator status [OPTIONS]
+```
+
+**Options:**
+- `--detailed` - Show detailed service information including endpoints
+
+### Set scenario
+
+```bash
+apicentric simulator set-scenario --service <NAME> --scenario <SCENARIO>
+```
+
+Activate a specific scenario for a service.
+
+### Inspect service
+
+```bash
+apicentric simulator inspect --file <SERVICE.yaml>
+```
+
+Validate and display service configuration details.
+
+## Import from other formats
+
+Convert existing API definitions to Apicentric format:
+
+```bash
+# From OpenAPI
+apicentric simulator import --input openapi.json --output service.yaml --format openapi
+
+# From Postman collection
+apicentric simulator import --input collection.json --output service.yaml --format postman
+
+# From WireMock
+apicentric simulator import --input wiremock.json --output service.yaml --format wiremock
+
+# From Mockoon
+apicentric simulator import --input mockoon.json --output service.yaml --format mockoon
+```
+
+## Dockerize services
+
+Package your mock services into a portable Docker image:
+
+```bash
+apicentric simulator dockerize --file user-api.yaml --output ./docker-build
+
+cd docker-build
+docker build -t user-api .
+docker run -p 9001:9001 user-api
+```
+
+This creates a self-contained image that can run anywhere Docker is available.
+
+## Configuration examples
+
+### E-commerce API
+
+```yaml
+name: E-commerce API
+version: "1.0"
+server:
+  port: 9002
+  base_path: /api
+
+fixtures:
+  products:
+    - id: 101
+      name: "Laptop"
+      price: 999.99
+    - id: 102
+      name: "Mouse"
+      price: 29.99
+
+endpoints:
+  - method: GET
+    path: /products
+    responses:
+      200:
+        content_type: application/json
+        body: |
+          {
+            "products": {{json fixtures.products}},
+            "total": {{fixtures.products.length}}
+          }
+
+  - method: POST
+    path: /orders
+    responses:
+      201:
+        body: |
+          {
+            "order_id": {{faker "datatype.uuid"}},
+            "total": {{request.body.total}},
+            "status": "confirmed"
+          }
+```
+
+### Authentication API
+
+```yaml
+name: Auth API
+version: "1.0"
+server:
+  port: 9003
+  base_path: /auth
+
+endpoints:
+  - method: POST
+    path: /login
+    responses:
+      200:
+        condition: "{{and request.body.username request.body.password}}"
+        body: |
+          {
+            "token": "{{faker \"datatype.uuid\"}}",
+            "expires_in": 3600
+          }
+      401:
+        body: '{"error": "Invalid credentials"}'
+
+  - method: POST
+    path: /refresh
+    responses:
+      200:
+        condition: "{{request.headers.Authorization}}"
+        body: |
+          {
+            "token": "{{faker \"datatype.uuid\"}}",
+            "expires_in": 3600
+          }
+      401:
+        body: '{"error": "Unauthorized"}'
+```
+
+## Tips and best practices
+
+<Tip>
+  Use fixtures for consistent test data across multiple endpoints. This makes your mocks more maintainable.
+</Tip>
+
+<Note>
+  The simulator automatically reloads when you modify service YAML files, so you can iterate quickly without restarting.
+</Note>
+
+<Warning>
+  Avoid using the same port for multiple services. Each service must have a unique port number.
+</Warning>
+
+## Next steps
+
+- Learn about [Contract testing](/features/contract-testing) to validate mocks against real APIs
+- Generate [TypeScript types](/features/code-generation) from your service definitions
+- Use the [TUI](/features/tui) for interactive service management
+- Integrate with [MCP](/features/mcp-integration) to let AI assistants manage your mocks

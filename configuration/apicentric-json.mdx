@@ -1,0 +1,213 @@
+---
+title: apicentric.json
+description: Configure Apicentric's main settings including AI providers and simulator options
+---
+
+The `apicentric.json` file is the main configuration file for Apicentric. It defines global settings for AI code generation and the API simulator.
+
+## Location
+
+By default, Apicentric looks for `apicentric.json` in your project root directory.
+
+## Creating a configuration file
+
+You can generate a default configuration file using the CLI:
+
+```bash
+apicentric init
+```
+
+This creates an `apicentric.json` file with sensible defaults that you can customize for your project.
+
+## Configuration structure
+
+The configuration file uses JSON format with two main sections: `ai` and `simulator`.
+
+### Example configuration
+
+<CodeGroup>
+```json apicentric.json
+{
+  "ai": {
+    "provider": "gemini",
+    "api_key": "your-api-key-here",
+    "model": "gemini-2.5-flash"
+  },
+  "simulator": {
+    "enabled": true,
+    "services_dir": "services",
+    "port_range": {
+      "start": 9000,
+      "end": 9099
+    },
+    "db_path": "apicentric.db",
+    "admin_port": null,
+    "global_behavior": {
+      "latency": null,
+      "error_simulation": null,
+      "rate_limiting": null
+    }
+  }
+}
+```
+</CodeGroup>
+
+## AI configuration
+
+Configure AI-assisted code generation features.
+
+<ParamField path="ai" type="object" required>
+  AI generation configuration
+  
+  <ParamField path="ai.provider" type="string" required>
+    The AI provider to use for text generation.
+    
+    **Options:**
+    - `openai` - Use OpenAI API
+    - `gemini` - Use Google Gemini API
+    - `local` - Use a local language model
+  </ParamField>
+  
+  <ParamField path="ai.api_key" type="string">
+    API key for the selected provider. Required for `openai` and `gemini` providers.
+    
+    For Gemini, you can also set the `GEMINI_API_KEY` environment variable instead of storing the key in the config file.
+    
+    <Note>
+    For security, consider using environment variables instead of storing API keys directly in configuration files.
+    </Note>
+  </ParamField>
+  
+  <ParamField path="ai.model" type="string">
+    Model identifier for the AI provider.
+    
+    **Examples:**
+    - OpenAI: `gpt-4`, `gpt-3.5-turbo`
+    - Gemini: `gemini-2.5-flash`, `gemini-pro`
+  </ParamField>
+  
+  <ParamField path="ai.model_path" type="string">
+    Path to the local model when using the `local` provider. Required only for local models.
+  </ParamField>
+</ParamField>
+
+## Simulator configuration
+
+Configure the API simulator that runs your service definitions.
+
+<ParamField path="simulator" type="object" required>
+  API simulator configuration
+  
+  <ParamField path="simulator.enabled" type="boolean" required>
+    Whether the simulator is enabled. Set to `true` to activate the simulator.
+    
+    **Default:** `false`
+  </ParamField>
+  
+  <ParamField path="simulator.services_dir" type="string" required>
+    Directory containing service definition YAML files. The simulator watches this directory for changes.
+    
+    **Default:** `services`
+  </ParamField>
+  
+  <ParamField path="simulator.port_range" type="object" required>
+    Port range for automatic port assignment to services.
+    
+    <ParamField path="simulator.port_range.start" type="number" required>
+      Starting port number for the range.
+      
+      **Default:** `8000`
+    </ParamField>
+    
+    <ParamField path="simulator.port_range.end" type="number" required>
+      Ending port number for the range.
+      
+      **Default:** `8999`
+    </ParamField>
+  </ParamField>
+  
+  <ParamField path="simulator.db_path" type="string" required>
+    Path to SQLite database file for persistent storage of service state.
+    
+    **Default:** `apicentric.db`
+  </ParamField>
+  
+  <ParamField path="simulator.admin_port" type="number">
+    Port for the admin API server. If not specified, the admin API is disabled.
+    
+    **Default:** `null` (disabled)
+  </ParamField>
+  
+  <ParamField path="simulator.global_behavior" type="object">
+    Global behavior settings that apply to all services unless overridden.
+    
+    <ParamField path="simulator.global_behavior.latency" type="object">
+      Simulate network latency for all endpoints.
+      
+      <ParamField path="simulator.global_behavior.latency.min_ms" type="number" required>
+        Minimum latency in milliseconds.
+      </ParamField>
+      
+      <ParamField path="simulator.global_behavior.latency.max_ms" type="number" required>
+        Maximum latency in milliseconds.
+      </ParamField>
+    </ParamField>
+    
+    <ParamField path="simulator.global_behavior.error_simulation" type="object">
+      Simulate random errors for testing error handling.
+      
+      <ParamField path="simulator.global_behavior.error_simulation.enabled" type="boolean" required>
+        Enable error simulation.
+      </ParamField>
+      
+      <ParamField path="simulator.global_behavior.error_simulation.rate" type="number" required>
+        Error rate between 0.0 and 1.0 (e.g., 0.1 = 10% error rate).
+      </ParamField>
+      
+      <ParamField path="simulator.global_behavior.error_simulation.status_codes" type="array">
+        Array of HTTP status codes to return when simulating errors.
+        
+        **Example:** `[500, 502, 503]`
+      </ParamField>
+    </ParamField>
+    
+    <ParamField path="simulator.global_behavior.rate_limiting" type="object">
+      Simulate rate limiting for all services.
+      
+      <ParamField path="simulator.global_behavior.rate_limiting.enabled" type="boolean" required>
+        Enable rate limiting.
+      </ParamField>
+      
+      <ParamField path="simulator.global_behavior.rate_limiting.requests_per_minute" type="number" required>
+        Maximum number of requests allowed per minute.
+      </ParamField>
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+## Validation
+
+Apicentric validates your configuration file when loading it. Common validation errors include:
+
+- Missing required API keys for the selected AI provider
+- Invalid port numbers (must be >= 1024)
+- Invalid JSON syntax
+- Missing required fields
+
+If validation fails, you'll see detailed error messages explaining what needs to be fixed.
+
+<Warning>
+Sensitive fields like API keys are automatically redacted when displaying configuration through the admin API.
+</Warning>
+
+## Best practices
+
+1. **Use environment variables for secrets** - Store API keys in environment variables instead of committing them to version control
+2. **Keep port ranges reasonable** - Use port ranges that don't conflict with other services on your system
+3. **Enable global behaviors for testing** - Use latency and error simulation to test your application's resilience
+4. **Use descriptive service directories** - Organize your service definitions in a clear directory structure
+
+## Related pages
+
+- [service.yaml](/configuration/service-yaml) - Service definition file format
+- [Environment Variables](/configuration/environment-variables) - Environment variable reference

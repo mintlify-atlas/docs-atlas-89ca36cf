@@ -1,0 +1,148 @@
+---
+title: simulator start
+description: Start the API simulator with service definitions from a specified directory
+---
+
+Start the API simulator to run mock API services locally. The simulator loads service definitions from YAML files and exposes them as HTTP endpoints.
+
+## Usage
+
+```bash
+apicentric simulator start [OPTIONS] --services-dir <DIRECTORY>
+```
+
+## Arguments
+
+<ParamField path="--services-dir" type="string" required>
+  Path to the directory containing service definition YAML files. The simulator will load all service configurations from this location.
+</ParamField>
+
+## Options
+
+<ParamField path="--force" type="boolean" default="false">
+  Force stop any existing simulator instance before starting a new one. Use this when you need to restart the simulator with updated configurations.
+</ParamField>
+
+<ParamField path="--template" type="string">
+  Install and use a template from the marketplace before starting. Provide the template ID to automatically download and configure a pre-built service.
+</ParamField>
+
+<ParamField path="--config" type="string" default="apicentric.json">
+  Path to the configuration file (global option).
+</ParamField>
+
+<ParamField path="--mode" type="string">
+  Execution mode override: `ci`, `development`, or `debug` (global option).
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean" default="false">
+  Show what would be executed without actually starting the simulator (global option).
+</ParamField>
+
+<ParamField path="--verbose" type="boolean" default="false">
+  Enable verbose output for detailed logging (global option).
+</ParamField>
+
+<ParamField path="--db-path" type="string" default="apicentric.db">
+  Path to the SQLite database for simulator storage (global option).
+</ParamField>
+
+## Examples
+
+### Start simulator with services directory
+
+```bash
+apicentric simulator start --services-dir ./services
+```
+
+<Info>
+The simulator will continue running until you press Ctrl+C. All active services will be displayed with their URLs.
+</Info>
+
+**Example output:**
+
+```
+🚀 Starting API Simulator...
+📁 Services directory: ./services
+✅ API Simulator started (3 services, 3 active)
+   - users: http://localhost:8001/api/v1
+   - products: http://localhost:8002/api
+   - orders: http://localhost:8003/v1
+🔄 Simulator running... Press Ctrl+C to stop
+```
+
+### Force restart the simulator
+
+```bash
+apicentric simulator start --services-dir ./services --force
+```
+
+Use this when the simulator is already running and you want to restart it with updated service definitions.
+
+**Example output:**
+
+```
+🚀 Starting API Simulator...
+📁 Services directory: ./services
+🔄 Force stopping existing simulator...
+✅ API Simulator started (3 services, 3 active)
+```
+
+### Install template and start
+
+```bash
+apicentric simulator start --services-dir ./services --template ecommerce-api
+```
+
+This downloads the `ecommerce-api` template from the marketplace and starts the simulator with it.
+
+### Dry run mode
+
+```bash
+apicentric simulator start --services-dir ./services --dry-run
+```
+
+**Example output:**
+
+```
+🏃 Dry run: Would start API simulator (dir=./services, force=false)
+```
+
+## How it works
+
+When you run `simulator start`:
+
+1. If a template is specified, it's downloaded and installed to the services directory
+2. The simulator loads all YAML service definitions from the specified directory
+3. Each service is started on its configured port with the defined endpoints
+4. The simulator runs in the foreground, logging all incoming requests
+5. Press Ctrl+C to gracefully stop all services
+
+## Related commands
+
+- [`simulator stop`](/cli/simulator/stop) - Stop the running simulator
+- [`simulator status`](/cli/simulator/status) - Check simulator status
+- [`simulator validate`](/cli/simulator/validate) - Validate service definitions
+- [`simulator logs`](/cli/simulator/logs) - View request logs
+
+<Warning>
+Ensure that the ports specified in your service definitions are available. If ports are already in use, the simulator will fail to start.
+</Warning>
+
+## Troubleshooting
+
+### Simulator fails to start
+
+If you see errors when starting:
+
+- Check that the services directory exists and contains valid YAML files
+- Verify that ports are not already in use: `lsof -i :PORT`
+- Use `--force` to stop any existing simulator instance
+- Run `simulator validate` to check your service definitions
+
+### Configuration not found
+
+If you see "API simulator is not enabled or configured":
+
+- Ensure your `apicentric.json` has simulator configuration enabled
+- Check that the config file path is correct using `--config`

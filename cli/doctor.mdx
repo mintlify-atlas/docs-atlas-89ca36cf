@@ -1,0 +1,222 @@
+---
+title: doctor
+description: Check your system for potential issues and verify installation
+---
+
+The `doctor` command performs a comprehensive health check of your apicentric installation and environment.
+
+## Usage
+
+```bash
+apicentric doctor
+```
+
+No flags or arguments are required.
+
+## Checks performed
+
+The doctor command runs the following diagnostic checks:
+
+### 1. Apicentric version
+
+Verifies that apicentric is properly installed and reports the current version.
+
+```
+✅ v0.1.0
+```
+
+### 2. Rust installation
+
+Checks that Rust and Cargo are installed and accessible.
+
+```
+✅ cargo 1.78.0 (c1083181f 2024-02-29)
+```
+
+<Note>
+Cargo is required for building and running apicentric from source.
+</Note>
+
+### 3. Docker installation
+
+Verifies Docker availability for the `dockerize` command.
+
+```
+✅ Docker version 24.0.5, build ced0996
+```
+
+If Docker is not found:
+
+```
+⚠️ Docker not found (required for 'dockerize' command)
+```
+
+<Info>
+Docker is optional. This is a warning, not an error.
+</Info>
+
+### 4. Services directory
+
+Checks for the default `./services` directory.
+
+```
+✅ Found ./services
+```
+
+If not found:
+
+```
+ℹ️ ./services not found (will be created on first use)
+```
+
+### 5. Configuration file
+
+Looks for `apicentric.json` in the current directory.
+
+```
+✅ Found apicentric.json
+```
+
+If not found:
+
+```
+ℹ️ apicentric.json not found (using defaults)
+```
+
+## Sample output
+
+### All checks passed
+
+```bash
+$ apicentric doctor
+
+🏥 Apicentric Doctor
+Checking your system for potential issues...
+
+Checking apicentric version... ✅ v0.1.0
+Checking Rust installation... ✅ cargo 1.78.0 (c1083181f 2024-02-29)
+Checking Docker installation... ✅ Docker version 24.0.5, build ced0996
+Checking services directory... ✅ Found ./services
+Checking configuration... ✅ Found apicentric.json
+
+✨ All systems operational! (5 checks passed) You are ready to build.
+```
+
+### With warnings
+
+```bash
+$ apicentric doctor
+
+🏥 Apicentric Doctor
+Checking your system for potential issues...
+
+Checking apicentric version... ✅ v0.1.0
+Checking Rust installation... ✅ cargo 1.78.0 (c1083181f 2024-02-29)
+Checking Docker installation... ⚠️ Docker not found (required for 'dockerize' command)
+Checking services directory... ℹ️ ./services not found (will be created on first use)
+Checking configuration... ℹ️ apicentric.json not found (using defaults)
+
+✨ All systems operational! (5 checks passed) You are ready to build.
+```
+
+### With failures
+
+```bash
+$ apicentric doctor
+
+🏥 Apicentric Doctor
+Checking your system for potential issues...
+
+Checking apicentric version... ✅ v0.1.0
+Checking Rust installation... ❌ Cargo not found
+Checking Docker installation... ⚠️ Docker not found (required for 'dockerize' command)
+Checking services directory... ℹ️ ./services not found (will be created on first use)
+Checking configuration... ℹ️ apicentric.json not found (using defaults)
+
+⚠️ Some issues were found (4 checks passed, 1 failed). Please review the errors above.
+```
+
+## Exit codes
+
+| Code | Meaning |
+|------|----------|
+| 0 | All checks passed or only warnings |
+| 1 | One or more critical checks failed |
+
+## When to run doctor
+
+Run the doctor command:
+
+- **After installation**: Verify everything is set up correctly
+- **Before deployment**: Ensure production environment is ready
+- **When troubleshooting**: Identify missing dependencies or configuration issues
+- **In CI/CD**: Validate build environment before running tests
+
+## Fixing common issues
+
+### Cargo not found
+
+Install Rust and Cargo from [rustup.rs](https://rustup.rs/):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+### Docker not found
+
+Install Docker from [docker.com](https://www.docker.com/get-started/):
+
+- **macOS**: Docker Desktop
+- **Windows**: Docker Desktop or WSL2 with Docker Engine
+- **Linux**: Docker Engine via package manager
+
+### Services directory missing
+
+Create the directory manually:
+
+```bash
+mkdir services
+```
+
+Or let apicentric create it when you run `simulator start`.
+
+### Configuration file missing
+
+Create a minimal configuration:
+
+```bash
+echo '{}' > apicentric.json
+```
+
+Or use the default configuration by not providing a file.
+
+## Use in scripts
+
+The doctor command is useful in automation:
+
+```bash
+#!/bin/bash
+
+if apicentric doctor; then
+  echo "Environment ready"
+  apicentric simulator start --services-dir ./services
+else
+  echo "Environment check failed"
+  exit 1
+fi
+```
+
+## Dry run mode
+
+The `doctor` command is not affected by `--dry-run` since it only reads system state.
+
+```bash
+apicentric --dry-run doctor
+# Same output as without --dry-run
+```
+
+## Next steps
+
+- Fix any issues reported by doctor
+- Create your first [service definition](/configuration/services)
+- Start the simulator with `apicentric simulator start`
