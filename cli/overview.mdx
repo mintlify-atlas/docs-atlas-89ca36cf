@@ -54,6 +54,18 @@ These flags are available for all commands:
   </Card>
 </CardGroup>
 
+### Utility commands
+
+<CardGroup cols={2}>
+  <Card title="new" icon="plus">
+    Create a new service definition interactively
+  </Card>
+  
+  <Card title="open" icon="browser">
+    Open the WebUI in your default browser
+  </Card>
+</CardGroup>
+
 ### Advanced commands
 
 <CardGroup cols={2}>
@@ -87,6 +99,52 @@ Test commands without executing them:
 ```bash
 apicentric --dry-run simulator start --services-dir ./services
 ```
+
+## Quick command reference
+
+### new
+
+Create a new service definition interactively with a guided wizard.
+
+```bash
+apicentric new <name> [--template <template>]
+```
+
+**Examples:**
+
+```bash
+# Create with default template
+apicentric new my-api
+
+# Create with specific template
+apicentric new my-api --template rest
+```
+
+The wizard will guide you through creating endpoints, responses, and fixtures.
+
+<Tip>
+Use `apicentric simulator new` for a file-based approach or `apicentric new` for the interactive wizard.
+</Tip>
+
+### open
+
+Open the WebUI in your default browser.
+
+```bash
+apicentric open [--port <port>]
+```
+
+**Examples:**
+
+```bash
+# Open WebUI on default port
+apicentric open
+
+# Open WebUI on specific port
+apicentric open --port 9002
+```
+
+The WebUI provides a visual interface for managing services, viewing logs, and testing endpoints.
 
 ## Next steps
 
