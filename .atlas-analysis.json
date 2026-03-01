@@ -1,0 +1,169 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Apicentric",
+  "projectDescription": "A powerful CLI tool and API simulator platform for developers who love the terminal",
+  "theme": "aspen",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/service-definitions",
+              "concepts/fixtures-and-templating",
+              "concepts/scenarios"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/api-simulator",
+              "features/contract-testing",
+              "features/code-generation",
+              "features/mcp-integration",
+              "features/iot-digital-twins",
+              "features/graphql-mocking",
+              "features/tui"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-mock-apis",
+              "guides/request-validation",
+              "guides/dockerizing-services",
+              "guides/importing-specs",
+              "guides/exporting-specs",
+              "guides/contract-testing-workflow",
+              "guides/digital-twin-setup"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/plugins",
+              "advanced/scripting",
+              "advanced/custom-templates"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/doctor-command"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/simulator",
+              "cli/contract",
+              "cli/mcp",
+              "cli/twin",
+              "cli/tui",
+              "cli/doctor",
+              "cli/ai"
+            ]
+          },
+          {
+            "group": "Simulator Commands",
+            "pages": [
+              "cli/simulator/start",
+              "cli/simulator/stop",
+              "cli/simulator/status",
+              "cli/simulator/validate",
+              "cli/simulator/logs",
+              "cli/simulator/import",
+              "cli/simulator/export",
+              "cli/simulator/dockerize",
+              "cli/simulator/generate-types",
+              "cli/simulator/generate-query"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/apicentric-json",
+              "configuration/service-yaml",
+              "configuration/environment-variables"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Use Cases",
+            "pages": [
+              "examples/ecommerce-api",
+              "examples/user-management",
+              "examples/iot-sensor-simulation",
+              "examples/graphql-api"
+            ]
+          },
+          {
+            "group": "Integration Examples",
+            "pages": [
+              "examples/ci-cd-integration",
+              "examples/mcp-with-claude",
+              "examples/docker-deployment"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Mock APIs with YAML configuration",
+    "Contract testing between services",
+    "TypeScript and React Query code generation",
+    "MCP integration for AI assistants",
+    "IoT Digital Twin simulation with MQTT and Modbus",
+    "Terminal UI for service management",
+    "GraphQL API mocking",
+    "Docker containerization of services",
+    "Import from OpenAPI, Postman, WireMock, Mockoon",
+    "Export to OpenAPI and Postman formats"
+  ],
+  "publicApiSurface": [
+    "apicentric simulator start",
+    "apicentric simulator stop",
+    "apicentric simulator status",
+    "apicentric simulator validate",
+    "apicentric simulator import",
+    "apicentric simulator export",
+    "apicentric simulator dockerize",
+    "apicentric simulator generate-types",
+    "apicentric simulator generate-query",
+    "apicentric simulator logs",
+    "apicentric contract test",
+    "apicentric contract register",
+    "apicentric mcp",
+    "apicentric twin run",
+    "apicentric tui",
+    "apicentric doctor",
+    "apicentric open",
+    "apicentric ai generate"
+  ]
+}
